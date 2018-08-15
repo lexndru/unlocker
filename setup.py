@@ -5,6 +5,9 @@ from setuptools import setup
 from unlocker import __version__
 
 
+long_description = """Unlocker is a keychain and a CLI credentials manager.
+Useful when you use a terminal often than GUI applications for remote connections (e.g. databases, SSH, rsync). It can store passwords and private keys. It comes with addons to encrypt keychain and fast connect to servers."""
+
 setup(name="unlocker",
     packages=[
         "unlocker",
@@ -22,6 +25,7 @@ setup(name="unlocker",
     test_suite="tests",
     version=__version__,
     description="CLI credentials manager",
+    long_description=long_description,
     author="Alexandru Catrina",
     author_email="alex@codeissues.net",
     license="MIT",

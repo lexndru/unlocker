@@ -16,3 +16,4 @@ script:
   - unlocker -h
   - unlock help
   - lock help
+  - make tests
