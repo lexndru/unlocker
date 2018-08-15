@@ -2,6 +2,9 @@
 
 from setuptools import setup
 
+from unlocker import __version__
+
+
 setup(name="unlocker",
     packages=[
         "unlocker",
@@ -16,13 +19,14 @@ setup(name="unlocker",
         "ipaddress==1.0.17",
         "click==6.7"
     ],
-    version="0.1.0",
+    test_suite="tests",
+    version=__version__,
     description="CLI credentials manager",
     author="Alexandru Catrina",
     author_email="alex@codeissues.net",
     license="MIT",
     url="https://github.com/lexndru/unlocker",
-    download_url="https://github.com/lexndru/unlocker/archive/v0.1.0.tar.gz",
+    download_url="https://github.com/lexndru/unlocker/archive/v{}.tar.gz".format(__version__),
     keywords=["credentials manager", "keychain", "remote connection"],
     classifiers=[
         "Development Status :: 4 - Beta",

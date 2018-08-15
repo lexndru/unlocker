@@ -77,6 +77,7 @@ class Secret(object):
     VERSION = "?"
     UNLOCKER_DIR = ".unlocker"
     SECRETS_FILE = ".secrets"
+    SECRETS_LOCK = ".secrets.lock"
 
     @classmethod
     def get_secret_dir(cls):
@@ -114,6 +115,9 @@ class Secret(object):
         """
 
         try:
+            lockpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_LOCK)
+            if path.exists(lockpath):
+                Log.fatal("Secrets are locked!\nClosing...")
             fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
             secret_file = read_secrets(fullpath, "c")
             secret_version = secret_file.get(cls.VERSION)
@@ -121,7 +125,7 @@ class Secret(object):
                 secret_file.update({cls.VERSION: __version__})
             if secret_file.get(cls.VERSION) != __version__:
                 error = "Secrets have been stored with a different version " \
-                        "of Unlocker (current version {cv}; secrets {vs}). " \
+                        "of Unlocker (current version {cv}; secrets {vs})\n" \
                         "Closing..."
                 Log.fatal(error, cv=__version__, vs=secret_version)
             chmod(fullpath, 0600)
@@ -129,3 +133,19 @@ class Secret(object):
         except Exception as e:
             Log.fatal("Cannot read secrets because {e}", e=str(e))
         return None
+
+    @classmethod
+    def migrate_secrets(cls):
+        """Migrate stored secrets from another version to current version.
+
+        Raises:
+            Exception: If secrets cannot be migrated.
+        """
+
+        try:
+            fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
+            secret_file = read_secrets(fullpath, "c")
+            secret_file.update({cls.VERSION: __version__})
+            secret_file.close()
+        except Exception as e:
+            Log.fatal("Cannot migrate secrets because {e}", e=str(e))

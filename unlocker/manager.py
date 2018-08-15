@@ -61,7 +61,7 @@ class Manager(object):
     UPDATE_TTY_TEMPLATE = u"""
     Secrets successfully updated!
 
-        {user}@{host}:{port}
+    {user}@{host}:{port}
 
     """
 
@@ -70,14 +70,14 @@ class Manager(object):
 
     \033[91mThis is the last chance to save this secret.\033[0m
 
-        {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
+    {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
 
     """
 
     LOOKUP_TTY_TEMPLATE = u"""
     Secret {auth}
 
-        {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
+    {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
 
     """
 
@@ -262,9 +262,9 @@ class Manager(object):
 
         pk, passkey = self.fetch_stored_passkey()
         if pk == self.PK_PASSWORD:
-            print(b64encode(passkey))
+            print(self.get_password_passkey(b64encode(passkey)))
         elif pk == self.PK_PRIV_KEY:
-            print(passkey)
+            print(self.get_priv_key_passkey(b64encode(passkey)))
         else:
             Log.fatal("Error: passkey is neither password, nor private key")
 
@@ -281,6 +281,7 @@ class Manager(object):
             auth_type = "password (select mask and copy)"
         elif self.is_private_key(pass_type):
             auth_type = "private key (select and save it)"
+            passkey = "\n{}".format(passkey)
         display = self.LOOKUP_TTY_TEMPLATE.format(
                     host=self.auth.get_host_ip4(), port=self.auth.get_port(),
                     user=self.auth.get_user(), auth=auth_type, passkey=passkey)

@@ -25,7 +25,7 @@ from argparse import ArgumentParser
 
 from unlocker.util.log import Log
 from unlocker.util.secret import Secret
-from unlocker.util.helper import make_helper_script
+from unlocker.util.helper import deploy_unlock_script, deploy_lock_script
 
 from unlocker import __version__
 
@@ -41,12 +41,13 @@ Unlocker v{} - CLI credentials manager
 
 Usage:
   init          Create local keychain
-  setup         Create helper scripts
+  list          List known hosts from keychain
   append        Add new set of credentials to keychain
   update        Update or add set of credentials to keychain
   remove        Remove credentials from keychain
   lookup        Find password for provided host, port and user
-  list          List known hosts from keychain
+  addons        Install helper scripts
+  migrate       Migrate secrets to current unlocker version
 """.format(__version__)
 
 
@@ -249,12 +250,22 @@ class ShellParser(object):
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
 
-    def get_setup_shell(self):
-        """Shell getter for "setup" option.
+    def get_addons_shell(self):
+        """Shell getter for "addons" option.
         """
 
         try:
-            make_helper_script()
+            deploy_unlock_script() and deploy_lock_script()
+        except Exception as e:
+            Log.fatal("Aborting due to an error: {e}", e=str(e))
+        raise SystemExit
+
+    def get_migrate_shell(self):
+        """Shell getter for "migrate" option.
+        """
+
+        try:
+            Secret.migrate_secrets()
         except Exception as e:
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit

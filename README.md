@@ -1,4 +1,7 @@
 # Unlocker
+[![Build Status](https://travis-ci.org/lexndru/unlocker.svg?branch=master)](https://travis-ci.org/lexndru/unlocker)
+
+Unlocker is a keychain and a CLI credentials manager. Useful when you use a terminal often than GUI applications for remote connections (e.g. databases, SSH, rsync). It can store passwords and private keys. It comes with addons to encrypt keychain and fast connect to servers.
 
 ## Install
 ```
@@ -6,6 +9,8 @@ $ pip install unlocker
 ```
 
 ## Getting started
+In unlocker context, the keychain storage is called *secrets* and has a versioning system. Secrets stored in older versions of Unlocker may not be directly compatible, thus it's needed to migrate them before using.
+
 ```
 $ unlocker
               _            _
@@ -14,49 +19,93 @@ $ unlocker
  | |_| | | | | | (_) | (__|   <  __/ |
   \__,_|_| |_|_|\___/ \___|_|\_\___|_|
 
-Unlocker v0.1.0 - CLI credentials manager
+Unlocker v0.2.0 - CLI credentials manager
 
 Usage:
   init          Create local keychain
-  setup         Create helper scripts
+  list          List known hosts from keychain
   append        Add new set of credentials to keychain
   update        Update or add set of credentials to keychain
   remove        Remove credentials from keychain
   lookup        Find password for provided host, port and user
-  list          List known hosts from keychain
-
-$ unlocker init
-$ unlocker setup
-$ unlock
-             _            _             
- _   _ _ __ | | ___   ___| | _____ _ __
-| | | | '_ \| |/ _ \ / __| |/ / _ \ '__|
-| |_| | | | | | (_) | (__|   <  __/ |   
- \__,_|_| |_|_|\___/ \___|_|\_\___|_|   
-
-Unlocker v0.1.0 x86_64 GNU/Linux
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-  Please report bugs at http://github.com/lexndru/unlocker
-
-Usage:
-  service [user@]hostname[:port]  - Unlock server if credentials are known
-
-Examples:
-  redis 127.0.0.1:6379 (connect to local Redis with any available user)
-  mysql 127.0.0.1 (connect to MySQL with any available user)
-  mysql guest@database:3306 (connect to MySQL on port 3306 with user guest)
-  ssh root@yourserver.tld (connect to yourserver.tld with root user)
-  ssh yourserver.tld (connect to yourserver.tld with any available user)
+  addons        Install helper scripts
+  migrate       Migrate secrets to current unlocker version
 
 ```
+
+## Unlocker options
+
+- `init`: create the keychain on the current machine inside your `$HOME` directory. It's not mandatory to `init` before using *unlocker*.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker init
+   ```
+
+
+- `append`: append a new set of credentials to keychain. It returns an error if credentials already exist.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker append --host localhost --port 22 --user root --auth password --scheme ssh
+   ```
+
+- `update`: update an existing set of credentials from keychain. If credentials are not found, the update acts like `append` and adds credentials.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker update --host localhost --port 22 --user root --auth privatekey --scheme ssh
+   ```
+
+- `remove`: remove existing set of credentials from keychain. An error is returned if credentials are not found.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker remove --host localhost --port 22 --user root --scheme ssh
+   ```
+
+- `lookup`: lookup paskey from keychain. An error is returned if passkey is not found.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker lookup --host localhost --port 22 --user root
+   ```
+
+- `list`: displays a table-like list of existing credentials from keychain.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker list
+   ```
+
+- `migrate`: attempt to migrate secrets to current version of *unlocker*. Returns an error if migration is not possible, otherwise it exits silently.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker migrate
+   ```
+
+- `addons`: installs two (2) new POSIX shell scripts as *unlocker* wrappers.
+
+   *Sample usage:*
+
+   ```
+   $ unlocker addons
+   $ unlock   # passwordless connect e.g. unlock ssh root@localhost
+   $ lock     # encrypts secrets
+   ```
+
+## Next steps
+- [x] Additional helper script to unlock servers
+- [x] Encrypt secrets file
+- [ ] Support database connections through tunnels and jump servers
 
 ## License
 Copyright 2018 Alexandru Catrina

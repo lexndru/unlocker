@@ -26,16 +26,92 @@ from os.path import expanduser
 
 from unlocker.util.log import Log
 
+from unlocker import __version__
+
 
 SCRIPTS_DIR = "bin"
-UNLOCK_SCRIPT = """#!/bin/sh
+SCRIPTS_SHEBANG = """#!/bin/sh
 
-echo Missing lock script...
-"""
+VERSION={version}
+HOMEPAGE={homepage}
+""".format(version=__version__, homepage="http://github.com/lexndru/unlocker")
 
 
-def make_helper_script():
+def deploy_lock_script():
+    """Install LOCK script on current machine.
+
+    Raises:
+        Exception: If script is missing or cannot be accessed.
+
+    Return:
+        bool: True if successfully deployed, otherwise False.
+    """
+
+    return deploy_script("lock")
+
+
+def deploy_unlock_script():
+    """Install UNLOCK script on current machine.
+
+    Raises:
+        Exception: If script is missing or cannot be accessed.
+
+    Return:
+        bool: True if successfully deployed, otherwise False.
+    """
+
+    return deploy_script("unlock")
+
+
+def deploy_script(script_name):
+    """Install script on current machine.
+
+    Args:
+        script_name (str): The name of script to be deployed.
+
+    Raises:
+        Exception: If script is missing or cannot be accessed.
+
+    Return:
+        bool: True if successfully deployed, otherwise False.
+    """
+
+    content = read_helper_script("unlocker/data/{}".format(script_name))
+    if not content:
+        Log.fatal("Helper script is missing")
+    script = "{}\n{}".format(SCRIPTS_SHEBANG, content)
+    return make_helper_script(script_name, script)
+
+
+def read_helper_script(filepath):
+    """Read helper script
+
+    Args:
+        filepath (str): Path to helper script to read.
+
+    Raises:
+        Exception: If helper script cannot be accessed.
+
+    Return:
+        unicode: Unicode content of helper script.
+    """
+
+    try:
+        file_script = path.abspath(filepath)
+        if not path.exists(file_script):
+            Log.fatal("Cannot find helper script {file}", file=filepath)
+        with open(file_script, "rb") as fd:
+            return fd.read()
+    except Exception as e:
+        Log.fatal("Cannot read helper script: {e}", e=str(e))
+
+
+def make_helper_script(file_script, script_content):
     """Create executable helper script.
+
+    Args:
+        file_script        (str): Script to make.
+        script_content (unicode): Script content.
 
     Raises:
         Exception: If application cannot create directory or file.
@@ -56,11 +132,11 @@ def make_helper_script():
     except Exception as e:
         Log.fatal("Failed to create scripts directory: {err}", err=str(e))
     try:
-        filepath = "{}/unlock".format(scripts_dir)
+        filepath = "{}/{}".format(scripts_dir, file_script)
         if path.exists(filepath):
             Log.fatal("A file with this name already exists: {x}", x=filepath)
         with open(filepath, "wb") as fd:
-            fd.write(UNLOCK_SCRIPT)
+            fd.write(script_content)
         mod = stat(filepath)
         chmod(filepath, mod.st_mode | S_IEXEC)
         return True

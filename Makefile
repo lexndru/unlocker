@@ -1,11 +1,11 @@
 CWD=$(shell pwd)
 SRC_DIR=unlocker
 
-.PHONY: all clean build lint
+.PHONY: all clean build lint tests
 
 all: clean lint build
 
-build:
+build: lint tests
 	cd /tmp && virtualenv $(SRC_DIR) && cd $(SRC_DIR)
 	cp -R $(CWD) /tmp/$(SRC_DIR)
 	ls -l
@@ -20,3 +20,6 @@ release: build
 
 lint:
 	flake8 $(SRC_DIR)
+
+tests:
+	python -m unittest discover -v tests
