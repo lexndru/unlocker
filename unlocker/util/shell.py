@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+from __future__ import print_function
+
 from sys import argv
 from argparse import ArgumentParser
 
@@ -106,7 +108,8 @@ class ShellParser(object):
             SystemExit: After message is printed.
         """
 
-        raise SystemExit(HELP_MESSAGE)
+        print(HELP_MESSAGE)
+        raise SystemExit
 
     def get_args(self):
         """Call supported shell based on given option.
