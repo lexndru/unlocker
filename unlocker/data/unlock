@@ -54,7 +54,7 @@ if [ $(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l) = "1" ]; then
     fi
     rm -f $LOCKED_SECRETS
     if [ -z $1 ]; then
-        echo "Secrets are now unlocker"
+        echo "Secrets are now unlocked"
         exit 0
     fi
 fi

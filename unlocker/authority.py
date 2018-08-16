@@ -46,6 +46,7 @@ class Authority(object):
     def __init__(self):
         self.host, self.port, self.user = None, None, None
         self.scheme = "tcp"
+        self.ip_addr = u"0.0.0.0"
 
     def get_host(self):
         """Authority host getter.
@@ -87,9 +88,12 @@ class Authority(object):
         if not isinstance(host, (str, unicode)):
             Log.fatal("Invalid host: expected string, got {x}", x=type(host))
         try:
-            ip_addr = unicode(gethostbyname(host))
-            Log.debug("Resolved hostname to IP {ip}", ip=ip_addr)
-            self.host = int(ip_address(ip_addr))
+            self.ip_addr = unicode(gethostbyname(host))
+            Log.debug("Resolved hostname to IP {ip}", ip=self.ip_addr)
+        except Exception as e:
+            Log.warn("Cannot resolve hostname: {e}", e=str(e))
+        try:
+            self.host = int(ip_address(self.ip_addr))
             Log.debug("Parsing host as {ip}", ip=self.host)
         except Exception as e:
             Log.fatal("Invalid host: {e}", e=str(e))

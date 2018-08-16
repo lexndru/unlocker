@@ -5,14 +5,20 @@ from setuptools import setup
 from unlocker import __version__
 
 
-long_description = """Unlocker is a keychain and a CLI credentials manager.
-Useful when you use a terminal often than GUI applications for remote connections (e.g. databases, SSH, rsync). It can store passwords and private keys. It comes with addons to encrypt keychain and fast connect to servers."""
+_desc = "Unlocker is a keychain and a CLI credentials manager. Useful when " \
+        "you use a terminal often than GUI applications for remote " \
+        "connections (e.g. databases, SSH, rsync). It can store passwords " \
+        "and private keys. It comes with addons to encrypt keychain and " \
+        "fast passwordless connect to servers."
+
 
 setup(name="unlocker",
     packages=[
         "unlocker",
         "unlocker.util",
+        "unlocker.data",
     ],
+    include_package_data=True,
     entry_points = {
         "console_scripts": [
             "unlocker = unlocker.bootstrap:main"
@@ -25,7 +31,7 @@ setup(name="unlocker",
     test_suite="tests",
     version=__version__,
     description="CLI credentials manager",
-    long_description=long_description,
+    long_description=_desc,
     author="Alexandru Catrina",
     author_email="alex@codeissues.net",
     license="MIT",
