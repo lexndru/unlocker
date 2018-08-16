@@ -26,7 +26,7 @@ from os.path import expanduser
 
 from unlocker.util.log import Log
 
-from unlocker import __version__
+from unlocker import __version__, __project__
 
 
 SCRIPTS_DIR = "bin"
@@ -76,7 +76,7 @@ def deploy_script(script_name):
         bool: True if successfully deployed, otherwise False.
     """
 
-    content = read_helper_script("unlocker/data/{}".format(script_name))
+    content = read_helper_script("data/{}".format(script_name))
     if not content:
         Log.fatal("Helper script is missing")
     script = "{}\n{}".format(SCRIPTS_SHEBANG, content)
@@ -97,7 +97,7 @@ def read_helper_script(filepath):
     """
 
     try:
-        file_script = path.abspath(filepath)
+        file_script = path.abspath(path.join(__project__, filepath))
         if not path.exists(file_script):
             Log.fatal("Cannot find helper script {file}", file=filepath)
         with open(file_script, "rb") as fd:
