@@ -8,8 +8,17 @@ Unlocker is a keychain and a CLI credentials manager. Useful when you use a term
 $ pip install unlocker
 ```
 
+## Important note
+This software is in a **beta** phase, it is highly recommended to keep a copy of your credentials in a safe place! Also, please report any faulty runtime or unexpected behavior of Unlocker.
+
 ## Getting started
-In unlocker context, the keychain storage is called *secrets* and has a versioning system. Secrets stored in older versions of Unlocker may not be directly compatible, thus it's needed to migrate them before using.
+Unlocker is a simple storage for passwords and private keys. The main purpose of *unlocker* is to be a manager for such data and give CRUD-like options to add, update, read and delete sets of credentials.
+
+Stored credentials are kept inside a keychain-type database. In *unlocker* context, the keychain storage is called *secrets* and has a versioning system. Secrets stored in older versions of Unlocker may not be directly compatible, thus it's needed to migrate them before using. All stored sensible credentials are compressed and encoded.
+
+As a side feature, Unlocker has additional helper shell scripts that make it easier to use in day-to-day life. These scripts can be installed directly from unlocker's addons option: `unlocker addons`. The result of this operation are two (2) new scripts in your `~/bin` directory: an `unlock` wrapper script to make passwordless connections to known servers; and a `lock` script to encrypt your *secrets*.
+
+Notice: if for any reasons you have scripts named `lock` and `unlock` in your `~/bin` directory, *unlocker* will abort the installation of these scripts.
 
 ```
 $ unlocker
@@ -19,7 +28,7 @@ $ unlocker
  | |_| | | | | | (_) | (__|   <  __/ |
   \__,_|_| |_|_|\___/ \___|_|\_\___|_|
 
-Unlocker v0.2.0 - CLI credentials manager
+Unlocker v0.2.3 - CLI credentials manager
 
 Usage:
   init          Create local keychain
