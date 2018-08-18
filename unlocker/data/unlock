@@ -270,9 +270,18 @@ if [ -z $2 ]; then
     exit 1
 fi
 
+cleanup ()
+{
+    rm -rf /tmp/.unlocker
+    echo "Closing..."
+    exit 0
+}
+
 is_installed ? python
 is_installed ? pip
 is_installed ? unlocker
+
+trap cleanup 2 3
 
 echo "Trying to unlock $2..."
 unlock_service $@

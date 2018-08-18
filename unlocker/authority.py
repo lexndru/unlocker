@@ -21,7 +21,7 @@
 # THE SOFTWARE.
 
 from socket import gethostbyname
-from ipaddress import ip_address, IPv4Address, IPv6Address
+from ipaddress import ip_address, IPv4Address, IPv6Address, AddressValueError
 
 from unlocker.util.log import Log
 
@@ -37,6 +37,14 @@ class Authority(object):
         MAX_USER_LEN (int): max string length for username.
         DELIMITER    (str): authority delimiter used in string representation.
         COMPONENTS   (int): total number of components in a representation.
+
+    Args:
+        host    (int): IP address stored as an integer.
+        port    (int): Port number of hostname.
+        user    (str): Username assigned to hostname.
+        scheme  (str): Connection service scheme (has default; optional).
+        ip_addr (str): Resolved hostname to IP address (has default value).
+
     """
 
     MIN_PORT, MAX_PORT = 1, (2**16)-1
@@ -239,4 +247,10 @@ class Authority(object):
         if authority.count(cls.DELIMITER) != cls.COMPONENTS:
             Log.fatal("Cannot recover from an invalid authority")
         host, port, user, srv = authority.split(cls.DELIMITER, cls.COMPONENTS)
+        try:  # fix for non-linux platforms
+            host = str(IPv4Address(int(host, 10)))
+        except ValueError as e:
+            Log.warn("Cannot convert to IP4: {e}", e=str(e))
+        except AddressValueError as e:
+            Log.fatal("Invalid host address: {e}", e=str(e))
         return cls.new(host, port, user, srv)

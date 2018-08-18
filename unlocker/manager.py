@@ -27,7 +27,10 @@ from os import path
 from sys import stdin
 from base64 import b64encode
 from getpass import getpass
-from click import echo_via_pager as print_page
+try:
+    from click import echo_via_pager as print_page
+except ImportError:
+    def print_page(content): print(content)
 
 from unlocker.authority import Authority
 from unlocker.keychain import Keychain
@@ -481,7 +484,7 @@ class Manager(object):
             headers.append("-" * self.LIST_TTY_COLUMNS)
             rows[0:0] = headers
         rows.append("\n")
-        return print_page("\n".join(rows))
+        print_page("\n".join(rows))
 
     @classmethod
     def use(cls, secrets):
