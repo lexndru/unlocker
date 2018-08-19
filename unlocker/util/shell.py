@@ -31,7 +31,7 @@ from unlocker.util.helper import deploy_unlock_script, deploy_lock_script
 
 from unlocker import __version__
 
-
+OKAY_MESSAGE = "OK"
 HELP_MESSAGE = """
               _            _
   _   _ _ __ | | ___   ___| | _____ _ __
@@ -52,9 +52,7 @@ Usage:
   migrate       Migrate secrets to current unlocker version
 """.format(__version__)
 
-SECRETS_CREATED = "Successfully created new secrets storage"
-SECRETS_MIGRATED = "Successfully migrated secrets"
-SCRIPTS_CREATED = """Successfully created helper scripts
+SCRIPTS_CREATED = """OK
 The following commands are now available:
   unlock  - Establish connection to known servers
   lock    - Encrypt secrets storage"""
@@ -62,7 +60,7 @@ The following commands are now available:
 
 class ShellArgumnets(object):
 
-    host = ("-H", "--host"), {
+    host = ("-h", "--host"), {
         "help": "The hostname or IP address",
         "dest": "host",
         "action": "store"
@@ -147,13 +145,15 @@ class ShellParser(object):
             Parser: Argument parser build for given option with arguments.
         """
 
-        psr = ArgumentParser(description=description)
+        psr = ArgumentParser(description=description, add_help=False)
         for keys, vals in arguments.iteritems():
             short, long_ = keys
             if short is None:
                 psr.add_argument(long_, **vals)
             else:
                 psr.add_argument(short, long_, **vals)
+        psr.add_argument("--help", action="help",
+                         help="show this help message and exit")
         return psr
 
     def build_args(self, args=(), required=False):
@@ -256,7 +256,7 @@ class ShellParser(object):
 
         try:
             Secret.get_secret_file()
-            print(SECRETS_CREATED)
+            print(OKAY_MESSAGE)
         except Exception as e:
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
@@ -278,7 +278,7 @@ class ShellParser(object):
 
         try:
             Secret.migrate_secrets()
-            print(SECRETS_MIGRATED)
+            print(OKAY_MESSAGE)
         except Exception as e:
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit

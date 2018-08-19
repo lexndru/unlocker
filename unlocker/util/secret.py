@@ -22,7 +22,7 @@
 
 from __future__ import print_function
 
-from anydbm import open as read_secrets
+from shelve import open as read_secrets
 from os import path, makedirs, environ, chmod
 from os.path import expanduser
 
@@ -114,27 +114,27 @@ class Secret(object):
             object: Instance of opened secrets file.
         """
 
+        lockpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_LOCK)
+        if path.exists(lockpath):
+            Log.fatal("Secrets are locked!\nClosing...")
+        fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
         try:
-            lockpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_LOCK)
-            if path.exists(lockpath):
-                Log.fatal("Secrets are locked!\nClosing...")
-            fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
             secret_file = read_secrets(fullpath, "c")
-            if secret_file is None:
-                Log.fatal("Cannot create secret storage file...")
-            secret_version = secret_file.get(cls.VERSION)
-            if secret_version is None:
-                secret_file.update({cls.VERSION: __version__})
-            if secret_file.get(cls.VERSION) != __version__:
-                error = "Secrets have been stored with a different version " \
-                        "of Unlocker (current version {cv}; secrets {vs})\n" \
-                        "Closing..."
-                Log.fatal(error, cv=__version__, vs=secret_version)
             chmod(fullpath, 0600)
-            return secret_file
         except Exception as e:
-            Log.fatal("Cannot read secrets because {e}", e=str(e))
-        return None
+            Log.fatal("Cannot create secret storage file: {e}", e=str(e))
+        try:
+            assert secret_file[cls.VERSION]
+        except KeyError:
+            secret_file[cls.VERSION] = __version__
+        except Exception as e:
+            Log.fatal("Unsupported secrets driver or {e}", e=str(e))
+        if secret_file[cls.VERSION] != __version__:
+            error = "Secrets have been stored with a different version " \
+            "of Unlocker (current version {cv}; secrets {vs})\n" \
+            "Closing..."
+            Log.fatal(error, cv=__version__, vs=secret_file[cls.VERSION])
+        return secret_file
 
     @classmethod
     def migrate_secrets(cls):
@@ -144,10 +144,10 @@ class Secret(object):
             Exception: If secrets cannot be migrated.
         """
 
+        fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
         try:
-            fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
             secret_file = read_secrets(fullpath, "c")
-            secret_file.update({cls.VERSION: __version__})
+            secret_file[cls.VERSION] = __version__
             secret_file.close()
         except Exception as e:
             Log.fatal("Cannot migrate secrets because {e}", e=str(e))

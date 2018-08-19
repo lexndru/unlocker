@@ -47,7 +47,7 @@ class Keychain(object):
             value (str): Value to save for given key.
         """
 
-        if key in self.keychain:
+        if self.has(key):
             Log.fatal("Cannot add duplicates in keychain")
         self.update(key, value)
 
@@ -61,7 +61,9 @@ class Keychain(object):
             bool: True if keychain has key, otherwise False.
         """
 
-        return key in self.keychain
+        for k in self.lookup(key, partial=False):
+            return True
+        return False
 
     def get_value(self, key):
         """Returns real value for given key.
@@ -125,7 +127,7 @@ class Keychain(object):
             del self.keychain[key]
         return value
 
-    def lookup(self, key):
+    def lookup(self, key, partial=True):
         """Lookup key in keychain.
 
         Args:
@@ -135,8 +137,12 @@ class Keychain(object):
             str: Yields exact key(s) if found.
         """
 
-        for k in self.keychain.iterkeys():
-            if key == k or k.startswith(key):
+        if hasattr(self.keychain, "iterkeys"):
+            iterator = self.keychain.iterkeys
+        else:
+            iterator = self.keychain.keys
+        for k in iterator():
+            if key == k or (partial and k.startswith(key)):
                 yield k
 
     def __repr__(self):

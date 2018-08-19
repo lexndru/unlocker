@@ -13,6 +13,7 @@ build: lint tests
 clean:
 	find . -regextype posix-extended -regex ".*.pyc" -type f -delete
 	rm -rf /tmp/$(SRC_DIR)
+	docker rmi $(SRC_DIR)
 
 release: build
 	cd /tmp/$(SRC_DIR)/$(SRC_DIR) && python setup.py sdist
@@ -23,3 +24,9 @@ lint:
 
 tests:
 	python -m unittest discover -v tests
+
+docker:
+	docker build -t $(SRC_DIR) .
+
+sandbox:
+	docker run -it --rm --name $(SRC_DIR) $(SRC_DIR) sh

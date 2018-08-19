@@ -38,14 +38,13 @@ if [ "x$1" = "xhelp" ]; then
     exit 0
 fi
 
-if ! [ -x "$(command -v gpg)" ]; then
-    echo "Cannot decrypt secrets..."
-    echo "Please install gpg and try again"
-    echo "Closing..."
-    exit 1
-fi
-
 if [ $(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l) = "1" ]; then
+    if ! [ -x "$(command -v gpg)" ]; then
+        echo "Cannot decrypt secrets..."
+        echo "Please install gpg and try again"
+        echo "Closing..."
+        exit 1
+    fi
     gpg -o $SECRETS --decrypt $LOCKED_SECRETS
     if [ $? != "0" ]; then
         echo "Failed to decrypt secrets..."
