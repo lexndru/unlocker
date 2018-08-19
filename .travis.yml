@@ -9,6 +9,9 @@ git:
 install:
   - pip install -r requirements.txt
 
+env:
+  - DEBUG=true
+
 script:
   - python setup.py test
   - python setup.py install
