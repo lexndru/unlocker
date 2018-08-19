@@ -131,8 +131,8 @@ class Secret(object):
             Log.fatal("Unsupported secrets driver or {e}", e=str(e))
         if secret_file[cls.VERSION] != __version__:
             error = "Secrets have been stored with a different version " \
-            "of Unlocker (current version {cv}; secrets {vs})\n" \
-            "Closing..."
+                    "of Unlocker (current version {cv}; secrets {vs})\n" \
+                    "Closing..."
             Log.fatal(error, cv=__version__, vs=secret_file[cls.VERSION])
         return secret_file
 

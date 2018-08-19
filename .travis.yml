@@ -9,15 +9,12 @@ git:
 install:
   - pip install -r requirements.txt
 
-env:
-  - DEBUG=true
-
 script:
   - python setup.py test
   - python setup.py install
   - unlocker -h
-  - unlocker init
-  - unlocker addons
+  - DEBUG=true unlocker init
+  - DEBUG=true unlocker addons
   - unlock help
   - lock help
   - make tests
