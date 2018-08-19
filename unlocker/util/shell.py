@@ -52,6 +52,13 @@ Usage:
   migrate       Migrate secrets to current unlocker version
 """.format(__version__)
 
+SECRETS_CREATED = "Successfully created new secrets storage"
+SECRETS_MIGRATED = "Successfully migrated secrets"
+SCRIPTS_CREATED = """Successfully created helper scripts
+The following commands are now available:
+  unlock  - Establish connection to known servers
+  lock    - Encrypt secrets storage"""
+
 
 class ShellArgumnets(object):
 
@@ -249,6 +256,7 @@ class ShellParser(object):
 
         try:
             Secret.get_secret_file()
+            print(SECRETS_CREATED)
         except Exception as e:
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
@@ -259,6 +267,7 @@ class ShellParser(object):
 
         try:
             deploy_unlock_script() and deploy_lock_script()
+            print(SCRIPTS_CREATED)
         except Exception as e:
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
@@ -269,6 +278,7 @@ class ShellParser(object):
 
         try:
             Secret.migrate_secrets()
+            print(SECRETS_MIGRATED)
         except Exception as e:
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit

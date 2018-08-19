@@ -1,1 +1,1 @@
-include unlocker/data/*
+recursive-include unlocker/data *

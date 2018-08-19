@@ -28,7 +28,7 @@ $ unlocker
  | |_| | | | | | (_) | (__|   <  __/ |
   \__,_|_| |_|_|\___/ \___|_|\_\___|_|
 
-Unlocker v0.2.4 - CLI credentials manager
+Unlocker - CLI credentials manager
 
 Usage:
   init          Create local keychain

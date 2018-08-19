@@ -96,7 +96,7 @@ def deploy_script(script_name):
         bool: True if successfully deployed, otherwise False.
     """
 
-    content = read_helper_script("data/{}".format(script_name))
+    content = read_helper_script("data/shell/{}".format(script_name))
     if not content:
         Log.fatal("Helper script is missing")
     script = "{}\n{}".format(SCRIPTS_SHEBANG, content)
