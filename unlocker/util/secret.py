@@ -120,6 +120,8 @@ class Secret(object):
                 Log.fatal("Secrets are locked!\nClosing...")
             fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
             secret_file = read_secrets(fullpath, "c")
+            if secret_file is None:
+                Log.fatal("Cannot create secret storage file...")
             secret_version = secret_file.get(cls.VERSION)
             if secret_version is None:
                 secret_file.update({cls.VERSION: __version__})
