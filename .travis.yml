@@ -12,8 +12,9 @@ install:
 script:
   - python setup.py test
   - python setup.py install
-  - unlocker addons
   - unlocker -h
+  - unlocker init
+  - unlocker addons
   - unlock help
   - lock help
   - make tests
