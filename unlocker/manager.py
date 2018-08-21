@@ -60,6 +60,7 @@ class Manager(object):
 
     OR_LIST, OR_LOOKUP = "list", "lookup"
     OW_APPEND, OW_UPDATE, OW_REMOVE = "append", "update", "remove"
+    OW_MIGRATE = "migrate"
 
     UPDATE_TTY_TEMPLATE = u"""
     Secrets successfully updated!
@@ -88,8 +89,7 @@ class Manager(object):
     LIST_TTY_ROW = u"{scheme:>7} | {host:^63} | {addr:^21} | {user:^31}"
 
     HOSTNAME_REGEX = compile(
-        r"(?P<scheme>.+)\?(?P<user>.+)@(?P<host>.+):(?P<port>\d+)",
-        UNICODE)
+        r"(?P<scheme>.+)\?(?P<user>.+)@(?P<host>.+):(?P<port>\d+)", UNICODE)
 
     def __init__(self, option, args):
         self.option = option
@@ -209,6 +209,8 @@ class Manager(object):
         """
 
         passkey = self.get_secrets().get_value(self.get_storage_key())
+        if not isinstance(passkey, (str, unicode)):
+            Log.fatal("Unexpected {t} passkey, needs string", t=type(passkey))
         if len(passkey) == 0:
             Log.fatal("Zero-length passkey found: corrupted secrets?")
         return passkey[0], passkey[1:]
@@ -304,6 +306,8 @@ class Manager(object):
         """
 
         key = self.get_storage_key()
+        if not isinstance(value, (str, unicode)):
+            Log.fatal("Cannot save non-string passkey: {t}", t=type(value))
         if update:
             self.get_secrets().update(key, value)
         else:
@@ -470,6 +474,8 @@ class Manager(object):
             port = auth.get_port()
             user = auth.get_user()
             scheme = auth.get_scheme()
+            if self.args.get("scheme") and scheme != self.args.get("scheme"):
+                continue
             hostname = "n/a"
             finder = self.HOSTNAME_REGEX.match(each[shift_host:])
             if finder is not None:

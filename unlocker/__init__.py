@@ -27,4 +27,4 @@ from os import path
 __project__ = path.dirname(path.abspath(__file__))
 
 # current project version
-__version__ = "0.2.5"
+__version__ = "1.0.0"

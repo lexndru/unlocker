@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from sys import stdin
+from sys import stdin, argv
 from re import compile, UNICODE
 
 
@@ -47,7 +47,7 @@ class Stdin(object):
             bool: True if data is piped, otherwise False.
         """
 
-        if not stdin.isatty():
+        if len(argv) == 0 and not stdin.isatty():
             cls.buf_in = stdin.read()
             return len(cls.buf_in) > 0
         return False

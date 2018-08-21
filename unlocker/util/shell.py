@@ -246,7 +246,7 @@ class ShellParser(object):
         """
 
         arguments = self.build_args([
-            ShellArgumnets.host, ShellArgumnets.service
+            ShellArgumnets.service
         ])
         return self.get_parser(arguments, header).parse_args(argv[2:])
 
@@ -272,7 +272,7 @@ class ShellParser(object):
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
 
-    def get_migrate_shell(self):
+    def get_migrate_shell(self, header="Migrate stored secrets"):
         """Shell getter for "migrate" option.
         """
 
