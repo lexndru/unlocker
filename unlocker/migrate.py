@@ -20,11 +20,35 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from os import path
+from sys import stdin, stdout
+
+from unlocker.util.log import Log
 
 
-# absolute path to project directory
-__project__ = path.dirname(path.abspath(__file__))
+class Migrate(object):
+    """Secrets migration in and out.
+    """
 
-# current project version
-__version__ = "1.0.1"
+    def __init__(self, manager):
+        self.manager = manager
+
+    @classmethod
+    def discover(cls, manager):
+        if manager.args.get("import_secrets"):
+            if stdin.isatty():
+                Log.fatal("Migration failed: stdin is empty")
+            mig = Migrate(manager)
+            mig.import_secrets()
+        elif manager.args.get("export_secrets"):
+            if stdout.isatty():
+                Log.fatal("Migration failed: stdout is empty")
+            mig = Migrate(manager)
+            mig.export_secrets()
+        else:
+            Log.fatal("Unexpected migrate request...")
+
+    def import_secrets(self):
+        raise NotImplemented("Cannot import data yet")
+
+    def export_secrets(self):
+        raise NotImplemented("Cannot export data yet")

@@ -35,6 +35,7 @@ except ImportError:
 from unlocker.authority import Authority
 from unlocker.keychain import Keychain
 from unlocker.service import Service
+from unlocker.migrate import Migrate
 
 from unlocker.util.log import Log
 
@@ -103,6 +104,9 @@ class Manager(object):
         and vice-versa.
 
         It saves authority into self.auth
+
+        Returns:
+            self: Manager instance.
         """
 
         host, user = self.args.get("host"), self.args.get("user")
@@ -112,6 +116,7 @@ class Manager(object):
         if port is not None and scheme is None:
             scheme = Service.find_scheme(port)
         self.auth = Authority.new(host, port, user, scheme)
+        return self
 
     def call(self):
         """Call dispatcher.
@@ -125,22 +130,37 @@ class Manager(object):
         if self.option == self.OR_LIST:
             self.call_list()
         elif self.option == self.OR_LOOKUP:
-            self.make_auth()
             if stdin.isatty():
-                self.call_lookup()
+                self.make_auth().call_lookup()
             else:
-                self.dump_lookup()
+                self.make_auth().dump_lookup()
         elif self.option == self.OW_APPEND:
-            self.make_auth()
-            self.call_update(update_duplicate=False)
+            self.make_auth().call_update(update_duplicate=False)
         elif self.option == self.OW_UPDATE:
-            self.make_auth()
-            self.call_update(update_duplicate=True)
+            self.make_auth().call_update(update_duplicate=True)
         elif self.option == self.OW_REMOVE:
-            self.make_auth()
-            self.call_remove()
+            self.make_auth().call_remove()
+        elif self.option == self.OW_MIGRATE:
+            self.call_migrate()
         else:
             Log.fatal("Unsupported option: {o}", o=self.option)
+
+    def call_migrate(self):
+        """Migration wrapper.
+
+        Determine if action is to import or to export and launch process.
+
+        Raises:
+            Exception: If something goes terrible wrong.
+
+        Inputs:
+            stdin: Compressed import-ready secrets.
+
+        Outputs:
+            stdout: Compressed exported stored secrets.
+        """
+
+        Migrate.discover(self)
 
     def get_secrets(self):
         """Keychain getter.
@@ -198,7 +218,7 @@ class Manager(object):
 
         return self.PK_PRIV_KEY + passkey
 
-    def fetch_stored_passkey(self):
+    def fetch_stored_passkey(self, storage_key=None):
         """Stored passkey getter.
 
         Raises:
@@ -208,7 +228,9 @@ class Manager(object):
             tuple: Passkey type and vulnerable passkey.
         """
 
-        passkey = self.get_secrets().get_value(self.get_storage_key())
+        if storage_key is None:
+            storage_key = self.get_storage_key()
+        passkey = self.get_secrets().get_value(storage_key)
         if not isinstance(passkey, (str, unicode)):
             Log.fatal("Unexpected {t} passkey, needs string", t=type(passkey))
         if len(passkey) == 0:
@@ -454,6 +476,21 @@ class Manager(object):
                     user=self.auth.get_user(), auth=auth_type, passkey=passkey)
         print_page(display)
 
+    def query_storage(self):
+        """Query secrets from storage.
+        """
+
+        shift_host = len(self.HOSTNAME_PREFIX)
+        shift_auth = len(self.STORAGE_PREFIX)
+        for each in self.get_secrets().lookup(self.HOSTNAME_PREFIX):
+            authority = self.get_secrets().get_value(each)
+            auth = Authority.recover(authority[shift_auth:])
+            hostname = ""
+            finder = self.HOSTNAME_REGEX.match(each[shift_host:])
+            if finder is not None:
+                hostname = finder.groupdict().get("host")
+            yield (each, auth, hostname)
+
     def call_list(self):
         """List handler.
 
@@ -461,25 +498,15 @@ class Manager(object):
             stdout: Pager with table-like view of all hostnames.
         """
 
-        gen = self.get_secrets().lookup(self.HOSTNAME_PREFIX)
-        shift_host = len(self.HOSTNAME_PREFIX)
-        shift_auth = len(self.STORAGE_PREFIX)
+        headers = [
+            self.LIST_TTY_ROW.format(
+                scheme="scheme", addr="address", host="hostname", user="user"),
+            self.LIST_TTY_ROW.format(
+                scheme=("="*7), addr=("="*21), host=("="*63), user=("="*31))]
         rows = []
-        headers = [self.LIST_TTY_ROW.format(scheme="scheme", addr="address",
-                                            host="hostname", user="user")]
-        for each in gen:
-            authority_dump = self.get_secrets().get_value(each)
-            auth = Authority.recover(authority_dump[shift_auth:])
-            ipv4 = auth.get_host_ip4()
-            port = auth.get_port()
-            user = auth.get_user()
-            scheme = auth.get_scheme()
-            if self.args.get("scheme") and scheme != self.args.get("scheme"):
-                continue
-            hostname = "n/a"
-            finder = self.HOSTNAME_REGEX.match(each[shift_host:])
-            if finder is not None:
-                hostname = finder.groupdict().get("host")
+        for _, auth, hostname in self.query_storage():
+            ipv4, port = auth.get_host_ip4(), auth.get_port()
+            user, scheme = auth.get_user(), auth.get_scheme()
             row = self.LIST_TTY_ROW.format(
                     host=hostname, addr="{}:{}".format(ipv4, port),
                     scheme=scheme, user=user)
@@ -487,7 +514,6 @@ class Manager(object):
         if len(rows) == 0:
             rows.append("Nothing here... try \"unlocker append\"")
         else:
-            headers.append("-" * self.LIST_TTY_COLUMNS)
             rows[0:0] = headers
         rows.append("\n")
         print_page("\n".join(rows))

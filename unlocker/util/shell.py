@@ -245,10 +245,7 @@ class ShellParser(object):
             Namespace: Parsed arguments namespace for "list" option.
         """
 
-        arguments = self.build_args([
-            ShellArgumnets.service
-        ])
-        return self.get_parser(arguments, header).parse_args(argv[2:])
+        return self.get_parser({}, header).parse_args(argv[2:])
 
     def get_init_shell(self):
         """Shell getter for "init" option.
@@ -272,10 +269,22 @@ class ShellParser(object):
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
 
-    def get_migrate_shell(self, header="Migrate stored secrets"):
+    def get_migrate_shell(self):
         """Shell getter for "migrate" option.
         """
 
+        if len(argv[2:]) > 0:
+            psr = ArgumentParser(description="Migrate stored secrets")
+            grp = psr.add_mutually_exclusive_group()
+            grp.add_argument("--import",
+                             action="store_true",
+                             dest="import_secrets",
+                             help="Import secrets from STDIN")
+            grp.add_argument("--export",
+                             action="store_true",
+                             dest="export_secrets",
+                             help="Export secrets to STDOUT")
+            return psr.parse_args(argv[2:])
         try:
             Secret.migrate_secrets()
             print(OKAY_MESSAGE)

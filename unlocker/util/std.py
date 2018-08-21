@@ -47,7 +47,9 @@ class Stdin(object):
             bool: True if data is piped, otherwise False.
         """
 
-        if len(argv) == 0 and not stdin.isatty():
+        if len(argv) > 1:
+            return False
+        if not stdin.isatty():
             cls.buf_in = stdin.read()
             return len(cls.buf_in) > 0
         return False
