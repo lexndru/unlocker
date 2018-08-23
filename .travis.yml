@@ -14,7 +14,7 @@ script:
   - python setup.py install
   - unlocker -h
   - DEBUG=true unlocker init
-  - DEBUG=true unlocker addons
+  - DEBUG=true unlocker install
   - unlock help
   - lock help
   - make tests

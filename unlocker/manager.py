@@ -389,14 +389,18 @@ class Manager(object):
         except Exception as e:
             Log.fatal("Cannot read private key: {e}", e=str(e))
 
-    def save_hostname(self):
+    def save_hostname(self, host=None):
         """Add host to keychain.
+
+        Args:
+            host (str): Hostname to save.
 
         Raises:
             Exception: If host is not provided.
         """
 
-        host = self.args.get("host")
+        if host is None:
+            host = self.args.get("host")
         if host is None:
             return Log.warn("Hostname is missing (not set)")
         self.get_secrets().update(

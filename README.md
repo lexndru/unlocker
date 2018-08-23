@@ -101,12 +101,12 @@ Usage:
    $ unlocker migrate
    ```
 
-- `addons`: installs two (2) new POSIX shell scripts as *unlocker* wrappers.
+- `install`: installs two (2) new POSIX shell scripts as *unlocker* wrappers.
 
    *Sample usage:*
 
    ```
-   $ unlocker addons
+   $ unlocker install
    $ unlock   # passwordless connect e.g. unlock ssh root@localhost
    $ lock     # encrypts secrets
    ```

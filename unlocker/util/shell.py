@@ -48,7 +48,7 @@ Usage:
   update        Update or add set of credentials to keychain
   remove        Remove credentials from keychain
   lookup        Find password for provided host, port and user
-  addons        Install helper scripts
+  install       Install helper scripts
   migrate       Migrate secrets to current unlocker version
 """.format(__version__)
 
@@ -86,7 +86,7 @@ class ShellArgumnets(object):
         "choices": ["password", "privatekey"]
     }
 
-    service = (None, "--scheme"), {
+    service = ("-s", "--scheme"), {
         "help": "The scheme service name to display (e.g. ssh, http, mysql)",
         "dest": "scheme",
         "action": "store",
@@ -258,8 +258,8 @@ class ShellParser(object):
             Log.fatal("Aborting due to an error: {e}", e=str(e))
         raise SystemExit
 
-    def get_addons_shell(self):
-        """Shell getter for "addons" option.
+    def get_install_shell(self):
+        """Shell getter for "install" option.
         """
 
         try:
