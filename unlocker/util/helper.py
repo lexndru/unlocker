@@ -23,12 +23,19 @@
 from stat import S_IEXEC
 from os import path, makedirs, stat, chmod
 from os.path import expanduser
+try:
+    from os import geteuid
+
+    def is_root(): return geteuid() == 0
+except ImportError:
+    def is_root(): return False
 
 from unlocker.util.log import Log
 
 from unlocker import __version__, __project__
 
 
+SYSTEM_SCRIPTS_DIR = "/usr/local/bin"
 SCRIPTS_DIR = "bin"
 SCRIPTS_SHEBANG = ur"""#!/bin/sh
 #
@@ -140,7 +147,10 @@ def make_helper_script(file_script, script_content):
         bool: True if script was successfully created, otherwise False.
     """
 
-    scripts_dir = path.join(expanduser("~"), "bin")
+    if is_root():
+        scripts_dir = SYSTEM_SCRIPTS_DIR
+    else:
+        scripts_dir = path.join(expanduser("~"), SCRIPTS_DIR)
     Log.debug("Scripts directory located at {path}", path=scripts_dir)
     try:
         if not path.exists(scripts_dir):
