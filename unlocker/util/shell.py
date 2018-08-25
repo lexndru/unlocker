@@ -22,6 +22,7 @@
 
 from __future__ import print_function
 
+from os import environ
 from sys import argv
 from argparse import ArgumentParser
 
@@ -44,6 +45,8 @@ Unlocker v{} - CLI credentials manager
 Usage:
   init          Create local keychain
   list          List known hosts from keychain
+  recall        Retrieve passkey by signature (slower than lookup)
+  forget        Permanently forget passkey by signature (slower than remove)
   append        Add new set of credentials to keychain
   update        Update or add set of credentials to keychain
   remove        Remove credentials from keychain
@@ -92,8 +95,238 @@ class ShellArgumnets(object):
         "action": "store",
     }
 
+    jump_server = ("-j", "--jump-server"), {
+        "help": "Optional jump server (or tunnel server) for connections",
+        "dest": "jump_server",
+        "action": "store",
+    }
 
-class ShellParser(object):
+
+def get_append_shell(self, header="Add new set of credentials"):
+    """Shell getter for "append" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "append" option.
+    """
+
+    arguments = self.build_args([
+        ShellArgumnets.host, ShellArgumnets.port,
+        ShellArgumnets.user, ShellArgumnets.auth
+    ], True)
+    optional_arguments = self.build_args([
+        ShellArgumnets.service, ShellArgumnets.jump_server
+    ])
+    arguments.update(optional_arguments)
+    return self.get_parser(arguments, header).parse_args(argv[2:])
+
+
+def get_update_shell(self, header="Update set of credentials"):
+    """Shell getter for "update" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "update" option.
+    """
+
+    arguments = self.build_args([
+        ShellArgumnets.host, ShellArgumnets.port,
+        ShellArgumnets.user, ShellArgumnets.auth
+    ], True)
+    optional_arguments = self.build_args([
+        ShellArgumnets.service, ShellArgumnets.jump_server
+    ])
+    arguments.update(optional_arguments)
+    return self.get_parser(arguments, header).parse_args(argv[2:])
+
+
+def get_remove_shell(self, header="Remove credentials from keys database"):
+    """Shell getter for "remove" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "remove" option.
+    """
+
+    arguments = self.build_args([
+        ShellArgumnets.host, ShellArgumnets.port, ShellArgumnets.user
+    ], True)
+    arguments.update(self.build_args([ShellArgumnets.service]))
+    return self.get_parser(arguments, header).parse_args(argv[2:])
+
+
+def get_lookup_shell(self, header="Find key for provided user@host:port"):
+    """Shell getter for "lookup" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "lookup" option.
+    """
+
+    arguments = self.build_args([
+        ShellArgumnets.host, ShellArgumnets.port, ShellArgumnets.user
+    ], True)
+    arguments.update(self.build_args([ShellArgumnets.service]))
+    return self.get_parser(arguments, header).parse_args(argv[2:])
+
+
+def get_recall_shell(self, header="Retrieve passkey from keychain"):
+    """Shell getter for "recall" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "recall" option.
+    """
+
+    psr = ArgumentParser(description=header)
+    psr.add_argument("signature", help="Authority signature to lookup")
+    return psr.parse_args(argv[2:])
+
+
+def get_forget_shell(self, header="Permanently forget passkey"):
+    """Shell getter for "forget" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "forget" option.
+    """
+
+    psr = ArgumentParser(description=header)
+    psr.add_argument("signature", help="Authority signature to remove")
+    return psr.parse_args(argv[2:])
+
+
+def get_list_shell(self, header="List known hosts from keychain"):
+    """Shell getter for "list" option.
+
+    Args:
+        header (str): Description header to display on help message.
+
+    Returns:
+        Namespace: Parsed arguments namespace for "list" option.
+    """
+
+    psr = ArgumentParser(description=header)
+    psr.add_argument(
+        "-e", "--exclude", action="store_true", dest="exclude",
+        help="Exclude columns given as positional arguments")
+    psr.add_argument(
+        "-v", "--vertical", action="store_true", dest="vertical",
+        help="Display list of hosts vertically (80 columns compatibility)")
+    psr.add_argument("column", help="Columns to display", nargs="*")
+    return psr.parse_args(argv[2:])
+
+
+def get_init_shell(self):
+    """Shell getter for "init" option.
+    """
+
+    try:
+        Secret.get_secret_file()
+        print(OKAY_MESSAGE)
+    except Exception as e:
+        Log.fatal("Aborting due to an error: {e}", e=str(e))
+    raise SystemExit
+
+
+def get_install_shell(self):
+    """Shell getter for "install" option.
+    """
+
+    try:
+        deploy_unlock_script() and deploy_lock_script()
+        print(SCRIPTS_CREATED)
+    except Exception as e:
+        Log.fatal("Aborting due to an error: {e}", e=str(e))
+    raise SystemExit
+
+
+def get_migrate_shell(self):
+    """Shell getter for "migrate" option.
+    """
+
+    if len(argv[2:]) > 0:
+        psr = ArgumentParser(description="Migrate stored secrets")
+        grp = psr.add_mutually_exclusive_group()
+        grp.add_argument("--import",
+                         action="store_true",
+                         dest="import_secrets",
+                         help="Import secrets from STDIN")
+        grp.add_argument("--export",
+                         action="store_true",
+                         dest="export_secrets",
+                         help="Export secrets to STDOUT")
+        return psr.parse_args(argv[2:])
+    try:
+        Secret.migrate_secrets()
+        print(OKAY_MESSAGE)
+    except Exception as e:
+        Log.fatal("Aborting due to an error: {e}", e=str(e))
+    raise SystemExit
+
+
+def get_dump_shell(self):
+    """Shell getter for "dump" option.
+
+    Option available only in debug mode.
+    """
+
+    psr = ArgumentParser(description="Dump list of keys (debug mode)")
+    psr.add_argument("keys", help="Keys to debug (e.g. host)", nargs="+")
+    return psr.parse_args(argv[2:])
+
+
+def get_purge_shell(self):
+    """Shell getter for "purge" option.
+
+    Option available only in debug mode.
+    """
+
+    psr = ArgumentParser(description="Drop keys from storage (debug mode)")
+    psr.add_argument("keys", help="Keys to drop from keychain", nargs="+")
+    return psr.parse_args(argv[2:])
+
+
+methods = {
+    "get_init_shell": get_init_shell,
+    "get_list_shell": get_list_shell,
+    "get_recall_shell": get_recall_shell,
+    "get_forget_shell": get_forget_shell,
+    "get_append_shell": get_append_shell,
+    "get_update_shell": get_update_shell,
+    "get_remove_shell": get_remove_shell,
+    "get_lookup_shell": get_lookup_shell,
+    "get_install_shell": get_install_shell,
+    "get_migrate_shell": get_migrate_shell,
+}
+
+if environ.get("DEBUG") is not None:
+    methods.update({
+        "get_dump_shell": get_dump_shell,
+        "get_purge_shell": get_purge_shell
+    })
+    HELP_MESSAGE += """
+Debug:
+  dump          Dump all stored keys
+  purge         Force delete raw key (can corrupt entire keychain!)
+"""
+
+OptionParser = type("OptionParser", (object,), methods)
+
+
+class ShellParser(OptionParser):
     """Command line arguments wrapper.
 
     Arguments:
@@ -168,126 +401,3 @@ class ShellParser(object):
         """
 
         return {k: v.update({"required": required}) or v for k, v in args}
-
-    def get_append_shell(self, header="Add new set of credentials"):
-        """Shell getter for "append" option.
-
-        Args:
-            header (str): Description header to display on help message.
-
-        Returns:
-            Namespace: Parsed arguments namespace for "append" option.
-        """
-
-        arguments = self.build_args([
-            ShellArgumnets.host, ShellArgumnets.port,
-            ShellArgumnets.user, ShellArgumnets.auth
-        ], True)
-        arguments.update(self.build_args([ShellArgumnets.service]))
-        return self.get_parser(arguments, header).parse_args(argv[2:])
-
-    def get_update_shell(self, header="Update set of credentials"):
-        """Shell getter for "update" option.
-
-        Args:
-            header (str): Description header to display on help message.
-
-        Returns:
-            Namespace: Parsed arguments namespace for "update" option.
-        """
-
-        arguments = self.build_args([
-            ShellArgumnets.host, ShellArgumnets.port,
-            ShellArgumnets.user, ShellArgumnets.auth
-        ], True)
-        arguments.update(self.build_args([ShellArgumnets.service]))
-        return self.get_parser(arguments, header).parse_args(argv[2:])
-
-    def get_remove_shell(self, header="Remove credentials from keys database"):
-        """Shell getter for "remove" option.
-
-        Args:
-            header (str): Description header to display on help message.
-
-        Returns:
-            Namespace: Parsed arguments namespace for "remove" option.
-        """
-
-        arguments = self.build_args([
-            ShellArgumnets.host, ShellArgumnets.port, ShellArgumnets.user
-        ], True)
-        arguments.update(self.build_args([ShellArgumnets.service]))
-        return self.get_parser(arguments, header).parse_args(argv[2:])
-
-    def get_lookup_shell(self, header="Find key for provided user@host:port"):
-        """Shell getter for "lookup" option.
-
-        Args:
-            header (str): Description header to display on help message.
-
-        Returns:
-            Namespace: Parsed arguments namespace for "lookup" option.
-        """
-
-        arguments = self.build_args([
-            ShellArgumnets.host, ShellArgumnets.port, ShellArgumnets.user
-        ], True)
-        arguments.update(self.build_args([ShellArgumnets.service]))
-        return self.get_parser(arguments, header).parse_args(argv[2:])
-
-    def get_list_shell(self, header="List known hosts from keychain"):
-        """Shell getter for "list" option.
-
-        Args:
-            header (str): Description header to display on help message.
-
-        Returns:
-            Namespace: Parsed arguments namespace for "list" option.
-        """
-
-        return self.get_parser({}, header).parse_args(argv[2:])
-
-    def get_init_shell(self):
-        """Shell getter for "init" option.
-        """
-
-        try:
-            Secret.get_secret_file()
-            print(OKAY_MESSAGE)
-        except Exception as e:
-            Log.fatal("Aborting due to an error: {e}", e=str(e))
-        raise SystemExit
-
-    def get_install_shell(self):
-        """Shell getter for "install" option.
-        """
-
-        try:
-            deploy_unlock_script() and deploy_lock_script()
-            print(SCRIPTS_CREATED)
-        except Exception as e:
-            Log.fatal("Aborting due to an error: {e}", e=str(e))
-        raise SystemExit
-
-    def get_migrate_shell(self):
-        """Shell getter for "migrate" option.
-        """
-
-        if len(argv[2:]) > 0:
-            psr = ArgumentParser(description="Migrate stored secrets")
-            grp = psr.add_mutually_exclusive_group()
-            grp.add_argument("--import",
-                             action="store_true",
-                             dest="import_secrets",
-                             help="Import secrets from STDIN")
-            grp.add_argument("--export",
-                             action="store_true",
-                             dest="export_secrets",
-                             help="Export secrets to STDOUT")
-            return psr.parse_args(argv[2:])
-        try:
-            Secret.migrate_secrets()
-            print(OKAY_MESSAGE)
-        except Exception as e:
-            Log.fatal("Aborting due to an error: {e}", e=str(e))
-        raise SystemExit

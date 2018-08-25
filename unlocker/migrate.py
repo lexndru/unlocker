@@ -103,7 +103,7 @@ class Migrate(object):
         """
 
         rows = []
-        for key, auth, host in self.manager.query_storage():
+        for key, host, auth, _ in self.manager.query_storage():
             authority_dump = self.manager.get_secrets().get_value(key)
             ptype, passkey = self.manager.fetch_stored_passkey(authority_dump)
             ipv4 = auth.get_host_ip4()

@@ -114,7 +114,10 @@ Usage:
 ## Next steps
 - [x] Additional helper script to unlock servers
 - [x] Encrypt secrets file
-- [ ] Support database connections through tunnels and jump servers
+- [x] Support database connections through tunnels and jump servers
+- [ ] Add filter for list columns (with exclude option)
+- [ ] Replace CRC32 for its non-uniqueness hashes
+- [ ] Create helper scripts for MacOS and Windows
 
 ## License
 Copyright 2018 Alexandru Catrina

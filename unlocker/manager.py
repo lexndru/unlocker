@@ -20,28 +20,47 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from __future__ import print_function
-
 from re import compile, UNICODE
 from os import path
-from sys import stdin
+from sys import stdin, stdout
 from base64 import b64encode
 from getpass import getpass
-try:
-    from click import echo_via_pager as print_page
-except ImportError:
-    def print_page(content): print(content)
 
 from unlocker.authority import Authority
 from unlocker.keychain import Keychain
 from unlocker.service import Service
 from unlocker.migrate import Migrate
+from unlocker.display import Display
 
 from unlocker.util.log import Log
 
 
 class Manager(object):
     """Authority secrets manager.
+
+    The Manager is a dispatcher for various call options, such as saving
+    passkeys and removing them or lookup.
+
+    A saved passkey is prefixed with the passkey's type in a "storage key"
+    where a storage key is a known prefixed authority.
+
+        let "storage_key" be "storage_prefix" + "authority"
+
+        storage_key = passkey_type + actual_passkey
+
+    Additional information about hostnames are saved in hostnames keys. For
+    example, a hostname for an authority is saved as:
+
+        let "hostname_key" be "hostname_prefix" + "scheme?user@host:port"
+
+        hostname_key = storage_key
+
+    Saved "storage_key" can have a jump key for tunneling or bouncing. For
+    example, a database behind a server can be saved as:
+
+        let "jump_key" be "jump_prefix" + "authority"
+
+        jump_key = storage_key
 
     Arguments:
         __secrets (Keychain): Authority and passwords database.
@@ -55,40 +74,16 @@ class Manager(object):
     __secrets = None
 
     C_PASSWORD, C_PRIVATE_KEY = "password", "privatekey"
-    K_STORAGE, K_HOSTNAME = "$!{key}", "h!{scheme}?{user}@{host}:{port}"
     PK_PASSWORD, PK_PRIV_KEY = ".", ">"
-    STORAGE_PREFIX, HOSTNAME_PREFIX = "$!", "h!"
+    K_HOSTNAME = "{scheme}?{user}@{host}:{port}"
+    STORAGE_PREFIX, JUMP_PREFIX, HOSTNAME_PREFIX = "$!", "j!", "h!"
 
-    OR_LIST, OR_LOOKUP = "list", "lookup"
+    OR_LIST, OR_LOOKUP, OR_RECALL = "list", "lookup", "recall"
     OW_APPEND, OW_UPDATE, OW_REMOVE = "append", "update", "remove"
-    OW_MIGRATE = "migrate"
+    OW_FORGET, OW_MIGRATE = "forget", "migrate"
+    OR_DEBUG_DUMP, OW_DEBUG_PURGE = "dump", "purge"
 
-    UPDATE_TTY_TEMPLATE = u"""
-    Secrets successfully updated!
-
-    {user}@{host}:{port}
-
-    """
-
-    REMOVE_TTY_TEMPLATE = u"""
-    Permanently removed secret {auth}!
-
-    \033[91mThis is the last chance to save this secret.\033[0m
-
-    {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
-
-    """
-
-    LOOKUP_TTY_TEMPLATE = u"""
-    Secret {auth}
-
-    {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
-
-    """
-
-    LIST_TTY_COLUMNS = (7 + 63 + 21 + 31 + 9)
-    LIST_TTY_ROW = u"{scheme:>7} | {host:^63} | {addr:^21} | {user:^31}"
-
+    MAX_ITER_LIST = 2**16
     HOSTNAME_REGEX = compile(
         r"(?P<scheme>.+)\?(?P<user>.+)@(?P<host>.+):(?P<port>\d+)", UNICODE)
 
@@ -129,6 +124,10 @@ class Manager(object):
 
         if self.option == self.OR_LIST:
             self.call_list()
+        elif self.option == self.OR_RECALL:
+            self.call_recall(self.args.get("signature"))
+        elif self.option == self.OW_FORGET:
+            self.call_forget(self.args.get("signature"))
         elif self.option == self.OR_LOOKUP:
             if stdin.isatty():
                 self.make_auth().call_lookup()
@@ -142,6 +141,10 @@ class Manager(object):
             self.make_auth().call_remove()
         elif self.option == self.OW_MIGRATE:
             self.call_migrate()
+        elif self.option == self.OR_DEBUG_DUMP:
+            self.debug_dump()
+        elif self.option == self.OW_DEBUG_PURGE:
+            self.debug_purge()
         else:
             Log.fatal("Unsupported option: {o}", o=self.option)
 
@@ -171,14 +174,19 @@ class Manager(object):
 
         return self.__secrets
 
-    def get_storage_key(self):
+    def get_storage_key(self, storage_key=None):
         """Storage key generator and getter.
 
+        Args:
+            storage_key (str): Combine key to generate storage key.
+
         Returns:
-            str: Storage key formatted with current authority.
+            str: Storage key formatted with key or current authority.
         """
 
-        return self.K_STORAGE.format(key=self.auth.read())
+        if storage_key is None:
+            storage_key = self.auth.read()
+        return "{}{}".format(self.STORAGE_PREFIX, storage_key)
 
     def get_hostname_key(self, host):
         """Hostname key generator and getter.
@@ -190,9 +198,23 @@ class Manager(object):
             str: Hostname key formatted with host.
         """
 
-        return self.K_HOSTNAME.format(
+        return self.HOSTNAME_PREFIX + self.K_HOSTNAME.format(
                 host=host, user=self.auth.get_user(),
                 port=self.auth.get_port(), scheme=self.auth.get_scheme())
+
+    def get_jump_key(self, jump=None):
+        """Jump server key generator and getter.
+
+        Args:
+            jump (str): Combine jump key to generate jumpserver key.
+
+        Returns:
+            str: Jump server key formatted with authority.
+        """
+
+        if jump is None:
+            jump = self.auth.read()
+        return "{}{}".format(self.JUMP_PREFIX, jump)
 
     def get_password_passkey(self, passkey):
         """Password passkey getter.
@@ -289,11 +311,56 @@ class Manager(object):
 
         pk, passkey = self.fetch_stored_passkey()
         if pk == self.PK_PASSWORD:
-            print(self.get_password_passkey(b64encode(passkey)))
+            stdout.write(self.get_password_passkey(b64encode(passkey)))
         elif pk == self.PK_PRIV_KEY:
-            print(self.get_priv_key_passkey(b64encode(passkey)))
+            stdout.write(self.get_priv_key_passkey(b64encode(passkey)))
         else:
             Log.fatal("Error: passkey is neither password, nor private key")
+
+    def make_auth_from_signature(self, signature):
+        """Recover authority from signature.
+
+        Args:
+            signature (str): Possible authority to recover.
+
+        Returns:
+            Authority: Recovered authority if signature found in keychain.
+        """
+
+        for each in self.get_secrets().lookup(self.STORAGE_PREFIX):
+            auth = Authority.recover(each[len(self.STORAGE_PREFIX):])
+            if signature == auth.signature():
+                self.auth = auth
+                break
+        return self.auth
+
+    def call_recall(self, signature):
+        """Lookup wrapper without explicit authority.
+
+        Finds authority by signature and calls "lookup" for passkey.
+
+        Args:
+            signature (str): Possible authority signature to match.
+        """
+
+        self.make_auth_from_signature(signature)
+        if self.auth is None:
+            Log.fatal("Cannot find passkey for signature {s}", s=signature)
+        self.call_lookup()
+
+    def call_forget(self, signature):
+        """Remove wrapper without explicit authority.
+
+        Finds authority by signature and calls "remove" for passkey.
+
+        Args:
+            signature (str): Possible authority signature to match.
+        """
+
+        self.make_auth_from_signature(signature)
+        if self.auth is None:
+            Log.fatal("Signature {s} does not exist in keychain", s=signature)
+        self.call_remove()
 
     def call_lookup(self):
         """Lookup handler.
@@ -309,10 +376,7 @@ class Manager(object):
         elif self.is_private_key(pass_type):
             auth_type = "private key (select and save it)"
             passkey = "\n{}".format(passkey)
-        display = self.LOOKUP_TTY_TEMPLATE.format(
-                    host=self.auth.get_host_ip4(), port=self.auth.get_port(),
-                    user=self.auth.get_user(), auth=auth_type, passkey=passkey)
-        print_page(display)
+        Display.show_lookup(self.auth, auth_type, passkey)
 
     def save_passkey(self, value, update=False):
         """Passkey saver wrapper.
@@ -406,7 +470,7 @@ class Manager(object):
         self.get_secrets().update(
             self.get_hostname_key(host), self.get_storage_key())
 
-    def remove_hostname(self, storage_key):
+    def remove_hostname(self, storage_key, hostname=None):
         """Remove host from keychain.
 
         Args:
@@ -417,18 +481,61 @@ class Manager(object):
         """
 
         host = self.args.get("host")
-        if host is None:
-            return Log.warn("Hostname is missing (not set)")
-        gen = self.get_secrets().lookup(self.HOSTNAME_PREFIX)
-        hostname = self.get_hostname_key(host)
+        if host is None or host == "":
+            Log.debug("Hostname is missing (not set)")
+        else:
+            hostname = self.get_hostname_key(host)
         remove_list = []
-        for each in gen:
-            if each == hostname:
+        for each in self.get_secrets().lookup(self.HOSTNAME_PREFIX):
+            if hostname is not None and each == hostname:
                 remove_list.append(each)
             elif storage_key == self.get_secrets().get_value(each):
                 remove_list.append(each)
         for each in remove_list:
             self.get_secrets().remove(each)
+
+    def save_jump_server(self, jump_signature):
+        """Add jump server to keychain.
+
+        Args:
+            jump_signature (str): Signature to lookup.
+
+        Raises:
+            Exception: If signature is not provided or not found.
+        """
+
+        if jump_signature is None:
+            return Log.debug("Skipping invalid jump signature...")
+        jump_auth = None
+        for _, _, auth, _ in self.query_storage():
+            if jump_signature == auth.signature():
+                jump_auth = auth
+                break
+        if jump_auth is None:
+            return Log.fatal(
+                "Cannot find jump server for signature {server}\nClosing...",
+                server=jump_signature)
+        self.get_secrets().update(self.get_jump_key(), jump_auth.read())
+
+    def remove_jump_server(self, storage_key):
+        """Remove jump server from keychain.
+
+        Args:
+            storage_key (str): Signature to lookup.
+        """
+
+        if storage_key.startswith(self.STORAGE_PREFIX):
+            storage_key = storage_key[len(self.STORAGE_PREFIX):]
+        jump_servers = []
+        for each in self.get_secrets().lookup(self.JUMP_PREFIX):
+            if self.get_secrets().get_value(each) == storage_key:
+                jump_servers.append(each)
+        jump_key = self.get_jump_key(storage_key)
+        if len(jump_servers) > 0 and jump_key not in jump_servers:
+            error = "Remove all servers bouncing from this one before " \
+                    "trying to delete again\nClosing..."
+            Log.fatal(error)
+        self.get_secrets().remove(jump_key)
 
     def call_update(self, update_duplicate):
         """Update handler.
@@ -443,6 +550,9 @@ class Manager(object):
             Exception: If auth methos is not supported.
         """
 
+        jump = self.args.get("jump_server")
+        if jump is not None and jump != "":
+            self.save_jump_server(jump)
         auth = self.args.get("auth", "")
         if auth == self.C_PASSWORD:
             self.save_password(self.read_password(), update=update_duplicate)
@@ -451,10 +561,7 @@ class Manager(object):
         else:
             Log.fatal("Unsupported auth method...")
         self.save_hostname()
-        display = self.UPDATE_TTY_TEMPLATE.format(
-                    host=self.auth.get_host_ip4(), port=self.auth.get_port(),
-                    user=self.auth.get_user(), auth=auth)
-        print_page(display)
+        Display.show_update(self.auth)
 
     def call_remove(self):
         """Remove handler.
@@ -472,28 +579,89 @@ class Manager(object):
         elif self.is_private_key(pass_type):
             auth_type = "private key"
         for each in gen:
+            self.remove_jump_server(each)
             self.get_secrets().remove(each)
             self.remove_hostname(each)
             break  # let the user be aware of each item to remove if choosen
-        display = self.REMOVE_TTY_TEMPLATE.format(
-                    host=self.auth.get_host_ip4(), port=self.auth.get_port(),
-                    user=self.auth.get_user(), auth=auth_type, passkey=passkey)
-        print_page(display)
+        Display.show_remove(self.auth, auth_type, passkey)
 
-    def query_storage(self):
-        """Query secrets from storage.
+    def build_jump_key(self, key):
+        """Jump generator.
+
+        Args:
+            key (str): Key to lookup for jump server.
+
+        Returns:
+            str: Jump key formatted with key.
         """
 
-        shift_host = len(self.HOSTNAME_PREFIX)
-        shift_auth = len(self.STORAGE_PREFIX)
+        return "{}{}".format(self.JUMP_PREFIX, key)
+
+    def find_jump_auth(self, key):
+        """Jump server authority getter.
+
+        Finds an authority jump server for a given authority key.
+
+        Args:
+            key (str): Authority key to lookup for jump server attached.
+
+        Raises:
+            Exception: On corrupted authority recovery.
+
+        Returns:
+            Authority: Returns an authority as a jump server if found.
+        """
+
+        jump_key = self.build_jump_key(key)
+        if not self.get_secrets().has(jump_key):
+            return None
+        jump_auth = Authority.recover(self.get_secrets().get_value(jump_key))
+        if jump_auth is None:
+            return None
+        return jump_auth
+
+    def find_authority_from_host_key(self, host_key):
+        """Recover authority from host key.
+
+        Args:
+            host_key (str): Hostname key to lookup for storage_key.
+
+        Raises:
+            Exception: If authority is corrupted.
+
+        Returns:
+            tuple[str, Authority]: Recovered authority instance.
+        """
+
+        authority = self.get_secrets().get_value(host_key)
+        auth_key = authority[len(self.STORAGE_PREFIX):]
+        return auth_key, Authority.recover(auth_key)
+
+    def find_hostname_from_host_key(self, host_key):
+        """Find hostname from stored host key.
+
+        Args:
+            host_key (str): Hostname key to match agains regular expression.
+
+        Returns:
+            str: Hostname for an authority.
+        """
+
+        key = host_key[len(self.HOSTNAME_PREFIX):]
+        host, finder = "", self.HOSTNAME_REGEX.match(key)
+        if finder is not None:
+            host = finder.groupdict().get("host", "")
+        return host
+
+    def query_storage(self):
+        """Query secrets from keychain storage.
+        """
+
         for each in self.get_secrets().lookup(self.HOSTNAME_PREFIX):
-            authority = self.get_secrets().get_value(each)
-            auth = Authority.recover(authority[shift_auth:])
-            hostname = ""
-            finder = self.HOSTNAME_REGEX.match(each[shift_host:])
-            if finder is not None:
-                hostname = finder.groupdict().get("host")
-            yield (each, auth, hostname)
+            auth_key, auth = self.find_authority_from_host_key(each)
+            host = self.find_hostname_from_host_key(each)
+            jump = self.find_jump_auth(auth_key)
+            yield (each, host, auth, jump)
 
     def call_list(self):
         """List handler.
@@ -502,25 +670,61 @@ class Manager(object):
             stdout: Pager with table-like view of all hostnames.
         """
 
-        headers = [
-            self.LIST_TTY_ROW.format(
-                scheme="scheme", addr="address", host="hostname", user="user"),
-            self.LIST_TTY_ROW.format(
-                scheme=("="*7), addr=("="*21), host=("="*63), user=("="*31))]
-        rows = []
-        for _, auth, hostname in self.query_storage():
-            ipv4, port = auth.get_host_ip4(), auth.get_port()
-            user, scheme = auth.get_user(), auth.get_scheme()
-            row = self.LIST_TTY_ROW.format(
-                    host=hostname, addr="{}:{}".format(ipv4, port),
-                    scheme=scheme, user=user)
-            rows.append(row)
-        if len(rows) == 0:
-            rows.append("Nothing here... try \"unlocker append\"")
-        else:
-            rows[0:0] = headers
-        rows.append("\n")
-        print_page("\n".join(rows))
+        known_hosts = [(h, a, j) for _, h, a, j in self.query_storage()]
+        counter = -1
+        indexes = {}
+        sorted_hosts = []
+        while len(known_hosts) > 0:
+            if counter >= self.MAX_ITER_LIST:
+                Log.fatal("Max. iteration over list display reached...")
+            host, auth, jump = known_hosts[0]
+            counter += 1
+            if auth.signature() not in indexes:
+                indexes.update({auth.signature(): counter})
+            if jump is None:
+                sorted_hosts.append(known_hosts.pop(0))
+                continue
+            jump_index = indexes.get(jump.signature(), -1)
+            if jump_index > -1:
+                sorted_hosts.insert(jump_index, known_hosts.pop(0))
+                continue
+            known_hosts.insert(len(known_hosts), known_hosts.pop(0))
+        Display.show_list_view(sorted_hosts, **self.args)
+
+    def debug_dump(self):
+        """Dump all keys from keychain in debug mode.
+        """
+
+        for kt, prefix in self.debug_scan(self.args.get("keys")):
+            for key in self.get_secrets().lookup(prefix):
+                Log.debug("Found {kt} key: {k}", k=key[len(prefix):], kt=kt)
+
+    def debug_purge(self):
+        """Permanently unsafe remove keys from keychain. Can corrupt keychain!
+        """
+
+        for kt, key in self.debug_scan(self.args.get("keys")):
+            Log.debug("Force drop {key_type} key {k} ...", key_type=kt, k=key)
+            self.get_secrets().remove(key)
+
+    def debug_scan(self, keys):
+        """Scan debug parameters and return appropriate arguments.
+        """
+
+        if not isinstance(keys, list):
+            error = "Invalid usage of debug option: expected keys to be " \
+                    "list of strings, got {t}"
+            Log.fatal(error, t=type(keys))
+        for key in keys:
+            key = "{}!".format(key)
+            kt = "unsupported"
+            if key.startswith(self.STORAGE_PREFIX):
+                kt = "storage"
+            elif key.startswith(self.HOSTNAME_PREFIX):
+                kt = "host"
+            elif key.startswith(self.JUMP_PREFIX):
+                kt = "jump"
+            yield (kt, key)
 
     @classmethod
     def use(cls, secrets):

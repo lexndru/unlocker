@@ -22,6 +22,7 @@
 
 from socket import gethostbyname
 from ipaddress import ip_address, IPv4Address, IPv6Address, AddressValueError
+from zlib import crc32
 
 from unlocker.util.log import Log
 
@@ -200,6 +201,15 @@ class Authority(object):
             return "{}@{}:{}".format(self.user, self.get_host_ip4(), self.port)
         return "{}:{}:{}:{}".format(self.host, self.port, self.user,
                                     self.scheme)
+
+    def signature(self):
+        """Find the CRC32 hash of current authority.
+
+        Returns:
+            str: Hex value without 0x of the calculated CRC32.
+        """
+
+        return hex(crc32(self.read()) & 0xFFFFFFFF)[2:]  # skip 0x
 
     def __repr__(self):
         return self.read()

@@ -20,8 +20,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from __future__ import print_function
-
 from shelve import open as read_secrets
 from os import path, makedirs, environ, chmod
 from os.path import expanduser
