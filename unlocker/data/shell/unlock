@@ -85,20 +85,20 @@ is_installed ()
 get_passkey()
 {
     if [ "x$DEBUG" = "x*" ]; then
-        echo $@ | unlocker
+        echo $@ | unlocker | tr '\n' ' '
     else
-        echo $@ | unlocker 2> /dev/null
+        echo $@ | unlocker 2> /dev/null | tr '\n' ' '
     fi
 }
 
 get_password ()
 {
-    echo $1 | sed -En 's/^\.(.*)/\1/pg' | python -m base64 -d
+    echo $1 | sed -En 's/^password (.*)/\1/pg' | python -m base64 -d
 }
 
 get_private_key ()
 {
-    echo $1 | sed -En 's/^>(.*)/\1/pg' | python -m base64 -d
+    echo $1 | sed -En 's/^privatekey (.*)/\1/pg' | python -m base64 -d
 }
 
 unlock_service ()
@@ -125,9 +125,9 @@ unlock_service ()
                 echo "  2) I have a privatekey"
                 echo ""
                 read -p "Type number: " auth
-                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-u \1 -H \2 -p \3/pg')
+                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
                 if [ -z "$args" ]; then
-                    args=$(echo $2 | sed -En 's/(.+)@(.+)/-u \1 -H \2 -p 22/pg')
+                    args=$(echo $2 | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 22/pg')
                 fi
                 case $auth in
                     1) {
@@ -147,9 +147,9 @@ unlock_service ()
                 unlocker append $args
                 passkey=$(get_passkey ssh://$2)
             fi
-            password=$(get_password $passkey)
+            password=$(get_password "$passkey")
             if [ -z "$password" ]; then
-                privatekey=$(get_private_key $passkey)
+                privatekey=$(get_private_key "$passkey")
                 if [ -z "$privatekey" ]; then
                     echo "Cannot understand authentification method for $2"
                     echo "It may not be supported by unlocker or it may corrupted"
@@ -162,10 +162,8 @@ unlock_service ()
                 is_installed ? ssh
                 ssh $params
             else
-                export SSHPASS=$password
                 is_installed ? sshpass
-                sshpass -e ssh $params
-                unset SSHPASS
+                SSHPASS="$password" sshpass -e ssh $params
             fi
         }
         ;;
@@ -184,14 +182,14 @@ unlock_service ()
                 echo "Press any key to continue adding a password and store it for later"
                 echo "use, otherwise exit with ^C or add it to unlocker manually"
                 read -p "" anykey
-                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-u \1 -H \2 -p \3/pg')
+                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
                 if [ -z "$args" ]; then
-                    args=$(echo $2 | sed -En 's/(.+)@(.+)/-u \1 -H \2 -p 3306/pg')
+                    args=$(echo $2 | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 3306/pg')
                 fi
                 unlocker append $args -a password
                 passkey=$(get_passkey mysql://$2)
             fi
-            password=$(get_password $passkey)
+            password=$(get_password "$passkey")
             if [ -z "$password" ]; then
                 echo "Cannot understand authentification method for $2"
                 echo "It may not be supported by unlocker or it may corrupted"
@@ -221,17 +219,17 @@ unlock_service ()
                 echo "Press any key to continue adding a password and store it for later"
                 echo "use, otherwise exit with ^C or add it to unlocker manually"
                 read -p "" anykey
-                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-H \2 -p \3/pg')
+                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-h \2 -p \3/pg')
                 if [ -z "$args" ]; then
-                    args=$(echo $2 | sed -En 's/(.+):(.+)/-H \1 -p \2/pg')
+                    args=$(echo $2 | sed -En 's/(.+):(.+)/-h \1 -p \2/pg')
                     if [ -z "$args" ]; then
-                        args="-H $2 -p 6379"
+                        args="-h $2 -p 6379"
                     fi
                 fi
                 unlocker append $args -a password -u _
                 passkey=$(get_passkey redis://_@$2)
             fi
-            password=$(get_password $passkey)
+            password=$(get_password "$passkey")
             if [ -z "$password" ]; then
                 echo "Cannot understand authentification method for $2"
                 echo "It may not be supported by unlocker or it may corrupted"
@@ -247,7 +245,7 @@ unlock_service ()
             is_installed ? $1
             if [ $? != 0 ]; then
                 echo "$1 is installed on your system, but is not supported by Unlocker"
-                echo "Help by submiting an implementation or a request at $HOMEPAGE"
+                echo "Help by submitting an implementation or a request at $HOMEPAGE"
                 echo "Closing..."
                 exit 1
             fi

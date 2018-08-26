@@ -437,9 +437,15 @@ class Manager(object):
                 Log.debug("Removed {k} ...", k=key)
         Log.debug("Closing...")
 
-    def call_secret_read_stdout_dump_option(self, host_or_name,
-                                            user, port, scheme, **kwargs):
+    def call_secret_read_stdout_dump_option(self, host, user, port, scheme,
+                                            **kwargs):
         """Vulnerable passkey dump to stdout.
+
+        Args:
+            host   (str): Host to attach to authority.
+            port   (int): Port number to attach to authority.
+            user   (str): Username to attach to authority.
+            scheme (str): Scheme of the connection.
 
         Outputs:
             stdout: Base64 encoded passkey.
@@ -449,7 +455,7 @@ class Manager(object):
         """
 
         passkey = ""  # dummy passkey
-        auth = self.build_authority_from_args(user, host_or_name, port, scheme)
+        auth = self.build_authority_from_args(user, host, port, scheme)
         for each, name in self.get_db().query_auth():
             if each.signature() == auth.signature():
                 _, _, secret = self.get_db().lookup(name)
