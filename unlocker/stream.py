@@ -20,8 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from sys import stdin, argv
+from sys import argv, stdin
 from re import compile, UNICODE
+
+from unlocker.manager import Manager
+
+from unlocker.util.log import Log
 
 
 AUTHORITY_REGEXPR = "(?:(?P<scheme>.+)://)?" \
@@ -30,14 +34,15 @@ AUTHORITY_REGEXPR = "(?:(?P<scheme>.+)://)?" \
                     "(?:\:(?P<port>\d+))?"
 
 
-class Stdin(object):
-    """Standard input wrapper.
+class StreamData(object):
+    """Standard stream data wrapper.
 
     Arguments:
         buf_in (str): Input buffer used to store piped stdin.
     """
 
     buf_in = None
+    OPTION = "stdout_dump"
 
     @classmethod
     def read(cls):
@@ -68,10 +73,12 @@ class Stdin(object):
         exp = compile(AUTHORITY_REGEXPR, UNICODE)
         matches = exp.match(cls.buf_in)
         if matches is None:
-            return {}
+            error = "Unsupported authority, must be complied with " \
+                    "https://tools.ietf.org/html/rfc3986#section-3.2"
+            Log.fatal(error)
         args = matches.groupdict()
         if args.get("scheme") is None:
-            return {}
+            Log.fatal("Missing scheme from authority")
         if args.get("port") is None:
             args["port"] = service.find_port(args.get("scheme"))
         return args

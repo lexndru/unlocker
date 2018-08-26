@@ -22,7 +22,7 @@
 
 from unittest import TestCase
 
-from unlocker.service import Service
+from unlocker.util.service import Service
 
 
 class TestService(TestCase):

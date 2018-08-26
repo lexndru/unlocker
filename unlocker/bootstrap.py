@@ -20,12 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from unlocker.util.std import Stdin
 from unlocker.util.log import Log
 from unlocker.util.shell import ShellParser
 from unlocker.util.secret import confidential
+from unlocker.util.service import Service
 
-from unlocker.service import Service
+from unlocker.stream import StreamData
 from unlocker.manager import Manager
 
 
@@ -38,7 +38,7 @@ def unlocker(secrets, args=()):
     """
 
     # register secrets on keychain
-    Manager.use(secrets)
+    Manager.initialize(secrets)
 
     # initialize manager and parse arguments
     mng = Manager(*args)
@@ -51,9 +51,9 @@ def read_input():
     Some shell arguments can trigger exit before reaching end of function.
     """
 
-    # check if data is piped to unlocked
-    if Stdin.read():
-        return Manager.OR_LOOKUP, Stdin.parse(Service)
+    # check if data is piped to unlocked and dump passkey
+    if StreamData.read():
+        return StreamData.OPTION, StreamData.parse(Service)
 
     # initialize shell
     shell = ShellParser()

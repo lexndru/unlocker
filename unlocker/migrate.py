@@ -27,6 +27,7 @@ from base64 import b64encode, b64decode
 from uuid import uuid4
 from zipfile import ZipFile
 
+from unlocker.util.passkey import Passkey
 from unlocker.util.log import Log
 
 
@@ -76,22 +77,21 @@ class Migrate(object):
             line = each.split("\t")
             if len(line) == 0:
                 continue
-            scheme, host, ipv4, port, user, atype, passkey = line
-            self.manager.args = {
-                "scheme": scheme, "host": ipv4, "port": port, "user": user
-            }
-            self.manager.make_auth()
-            if atype == self.manager.C_PASSWORD:
-                method = "save_password"
-            elif atype == self.manager.C_PRIVATE_KEY:
-                method = "save_privatekey"
+            _, _, host, ipv4, port, user, scheme, name, ptype, passkey = line
+            if ptype not in Passkey.SUPPORTED_TYPES:
+                Log.fatal("Unsupported passkey storage {x}", x=ptype)
+            authority_args = user, host, port, scheme
+            auth = self.manager.build_authority_from_args(*authority_args)
+            if ptype == "privatekey":
                 passkey = zf_secrets.read(passkey)
-            else:
-                Log.fatal("Unsupported passkey storage {x}", x=atype)
-            if not hasattr(self.manager, method):
-                Log.fatal("Unsupported passkey method")
-            getattr(self.manager, method)(passkey)
-            self.manager.save_hostname(host)
+            data = {
+                "name": name,
+                "host": host,
+                "auth": auth,
+                "passkey": Passkey.SUPPORTED_TYPES.get(ptype) + passkey
+            }
+            self.manager.get_db().add(**data)
+        Log.warn("Unsupported import for jump server, yet")
 
     def export_secrets(self):
         """Export secrets wrapper.
@@ -103,20 +103,28 @@ class Migrate(object):
         """
 
         rows = []
-        for key, host, auth, _ in self.manager.query_storage():
-            authority_dump = self.manager.get_secrets().get_value(key)
-            ptype, passkey = self.manager.fetch_stored_passkey(authority_dump)
-            ipv4 = auth.get_host_ip4()
-            port = str(auth.get_port())
-            user = auth.get_user()
-            scheme = auth.get_scheme()
-            atype = "unsupported"
-            if self.manager.is_password(ptype):
-                atype = self.manager.C_PASSWORD
-            elif self.manager.is_private_key(ptype):
-                atype = self.manager.C_PRIVATE_KEY
+        for name, auth, host, jump in self.manager.get_db().query_all():
+            ipv4, port = auth.get_host_ip4(), str(auth.get_port())
+            user, scheme = auth.get_user(), auth.get_scheme()
+            _, _, secret = self.manager.get_db().lookup(name)
+            passtype, passkey = Passkey.copy(secret, True)
+            if passtype == "privatekey":
                 passkey = self.dump_pk_file(passkey, user, host, scheme)
-            rows.append((scheme, host, ipv4, port, user, atype, passkey))
+            jump_auth = "n/a"
+            if jump is not None:
+                jump_auth = jump.signature()
+            rows.append((
+                auth.signature(),  # auth signature
+                jump_auth,         # jump signature if any
+                host,              # hostname
+                ipv4,              # IPv4 address
+                port,              # port number
+                user,              # username
+                scheme,            # connection scheme
+                name,              # authority name
+                passtype,          # passkey type
+                passkey            # actual passkey or path to passkey
+            ))
         if len(rows) == 0:
             Log.fatal("Nothing to export...")
         self.flush_secrets(rows)

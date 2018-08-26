@@ -112,10 +112,11 @@ class Secret(object):
             object: Instance of opened secrets file.
         """
 
-        lockpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_LOCK)
+        secret_dir = cls.get_secret_dir()
+        lockpath = "{}/{}".format(secret_dir, cls.SECRETS_LOCK)
         if path.exists(lockpath):
             Log.fatal("Secrets are locked!\nClosing...")
-        fullpath = "{}/{}".format(cls.get_secret_dir(), cls.SECRETS_FILE)
+        fullpath = "{}/{}".format(secret_dir, cls.SECRETS_FILE)
         try:
             secret_file = read_secrets(fullpath, "c")
             chmod(fullpath, 0600)

@@ -115,8 +115,8 @@ Usage:
 - [x] Additional helper script to unlock servers
 - [x] Encrypt secrets file
 - [x] Support database connections through tunnels and jump servers
+- [x] Implement named records
 - [ ] Add filter for list columns (with exclude option)
-- [ ] Replace CRC32 for its non-uniqueness hashes
 - [ ] Create helper scripts for MacOS and Windows
 
 ## License

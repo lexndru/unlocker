@@ -32,6 +32,7 @@ from unlocker.util.helper import deploy_unlock_script, deploy_lock_script
 
 from unlocker import __version__
 
+
 OKAY_MESSAGE = "OK"
 HELP_MESSAGE = """
               _            _
@@ -45,10 +46,10 @@ Unlocker v{} - CLI credentials manager
 Usage:
   init          Create local keychain
   list          List known hosts from keychain
-  recall        Retrieve passkey by signature (slower than lookup)
-  forget        Permanently forget passkey by signature (slower than remove)
+  recall        Retrieve secrets by name or signature (slower than lookup)
+  forget        Forget secrets by name or signature (slower than remove)
   append        Add new set of credentials to keychain
-  update        Update or add set of credentials to keychain
+  update        Update password or private key to keychain
   remove        Remove credentials from keychain
   lookup        Find password for provided host, port and user
   install       Install helper scripts
@@ -62,6 +63,12 @@ The following commands are now available:
 
 
 class ShellArgumnets(object):
+
+    name = ("-n", "--name"), {
+        "help": "A name to recognize it later",
+        "dest": "name",
+        "action": "store"
+    }
 
     host = ("-h", "--host"), {
         "help": "The hostname or IP address",
@@ -117,7 +124,7 @@ def get_append_shell(self, header="Add new set of credentials"):
         ShellArgumnets.user, ShellArgumnets.auth
     ], True)
     optional_arguments = self.build_args([
-        ShellArgumnets.service, ShellArgumnets.jump_server
+        ShellArgumnets.name, ShellArgumnets.service, ShellArgumnets.jump_server
     ])
     arguments.update(optional_arguments)
     return self.get_parser(arguments, header).parse_args(argv[2:])
@@ -134,11 +141,10 @@ def get_update_shell(self, header="Update set of credentials"):
     """
 
     arguments = self.build_args([
-        ShellArgumnets.host, ShellArgumnets.port,
-        ShellArgumnets.user, ShellArgumnets.auth
+        ShellArgumnets.name, ShellArgumnets.auth
     ], True)
     optional_arguments = self.build_args([
-        ShellArgumnets.service, ShellArgumnets.jump_server
+        ShellArgumnets.jump_server
     ])
     arguments.update(optional_arguments)
     return self.get_parser(arguments, header).parse_args(argv[2:])
@@ -154,10 +160,7 @@ def get_remove_shell(self, header="Remove credentials from keys database"):
         Namespace: Parsed arguments namespace for "remove" option.
     """
 
-    arguments = self.build_args([
-        ShellArgumnets.host, ShellArgumnets.port, ShellArgumnets.user
-    ], True)
-    arguments.update(self.build_args([ShellArgumnets.service]))
+    arguments = self.build_args([ShellArgumnets.name], True)
     return self.get_parser(arguments, header).parse_args(argv[2:])
 
 
@@ -171,10 +174,7 @@ def get_lookup_shell(self, header="Find key for provided user@host:port"):
         Namespace: Parsed arguments namespace for "lookup" option.
     """
 
-    arguments = self.build_args([
-        ShellArgumnets.host, ShellArgumnets.port, ShellArgumnets.user
-    ], True)
-    arguments.update(self.build_args([ShellArgumnets.service]))
+    arguments = self.build_args([ShellArgumnets.name], True)
     return self.get_parser(arguments, header).parse_args(argv[2:])
 
 
@@ -284,7 +284,7 @@ def get_dump_shell(self):
     """
 
     psr = ArgumentParser(description="Dump list of keys (debug mode)")
-    psr.add_argument("keys", help="Keys to debug (e.g. host)", nargs="+")
+    psr.add_argument("keys", help="Keys to debug (e.g. host)")
     return psr.parse_args(argv[2:])
 
 
@@ -319,8 +319,8 @@ if environ.get("DEBUG") is not None:
     })
     HELP_MESSAGE += """
 Debug:
-  dump          Dump all stored keys
-  purge         Force delete raw key (can corrupt entire keychain!)
+  dump          Dump all entries from keychain
+  purge         Force delete key from keychain (can corrupt entire keychain!)
 """
 
 OptionParser = type("OptionParser", (object,), methods)

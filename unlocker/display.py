@@ -20,15 +20,25 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from __future__ import print_function
+from os import environ
+from sys import stdout
 
 try:
+    if environ.get("NOPAGER", "") == "true":
+        raise ImportError("NOPAGER is set")
     from click import echo_via_pager as print_page
 except ImportError:
-    def print_page(content): print(content)
+    def print_page(content): stdout.write(content)
 
 from unlocker.util.log import Log
 
+
+APPEND_TEMPLATE = u"""
+  Secrets successfully added!
+
+  {user}@{host}:{port}
+
+"""
 
 UPDATE_TEMPLATE = u"""
   Secrets successfully updated!
@@ -38,23 +48,23 @@ UPDATE_TEMPLATE = u"""
 """
 
 REMOVE_TEMPLATE = u"""
-  Permanently removed secret {auth_type}!
+  Permanently removed secret {auth_type} for {host}!
 
   \033[91mThis is the last chance to save this secret.\033[0m
 
-  {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
+  {user}@{ipv4}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
 
 """
 
 LOOKUP_TEMPLATE = u"""
-  Secret {auth_type}
+  Secret {auth_type} for {host}
 
-  {user}@{host}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
+  {user}@{ipv4}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
 
 """
 
 VERTICAL_LIST_TEMPLATE = u"""
-{nr:>4}) {sig} {jump_server}
+{nr:>4}) {name} ({sig}{jump_server})
       Hostname: {host}
       IPv4: {ip}
       Port: {port} ({proto})
@@ -94,33 +104,50 @@ class Display(object):
         print_page(content)
 
     @classmethod
-    def show_lookup(cls, auth, auth_type, passkey):
+    def show_lookup(cls, auth, host, pass_type, passkey):
         """Display passkey for lookup message.
 
         Args:
             auth (Authority): Matched authority.
-            auth_type  (str): Authentification method.
+            host       (str): Matched hostname.
+            pass_type  (str): Authentification method.
             passkey    (str): Password or private key.
         """
 
+        if pass_type == "privatekey":
+            passkey = "\n" + passkey
         content = LOOKUP_TEMPLATE.format(
-            host=auth.get_host_ip4(), port=auth.get_port(),
-            user=auth.get_user(), auth_type=auth_type, passkey=passkey)
+            ipv4=auth.get_host_ip4(), port=auth.get_port(), host=host,
+            user=auth.get_user(), auth_type=pass_type, passkey=passkey)
         cls.show(content)
 
     @classmethod
-    def show_remove(cls, auth, auth_type, passkey):
+    def show_remove(cls, auth, host, pass_type, passkey):
         """Display passkey for last time in remove message.
 
         Args:
             auth (Authority): Matched authority.
-            auth_type  (str): Authentification method.
+            host       (str): Matched hostname.
+            pass_type  (str): Authentification method.
             passkey    (str): Password or private key.
         """
 
         content = REMOVE_TEMPLATE.format(
+            ipv4=auth.get_host_ip4(), port=auth.get_port(), host=host,
+            user=auth.get_user(), auth_type=pass_type, passkey=passkey)
+        cls.show(content)
+
+    @classmethod
+    def show_append(cls, auth):
+        """Display confirmation on append message.
+
+        Args:
+            auth (Authority): Matched authority.
+        """
+
+        content = APPEND_TEMPLATE.format(
             host=auth.get_host_ip4(), port=auth.get_port(),
-            user=auth.get_user(), auth_type=auth_type, passkey=passkey)
+            user=auth.get_user())
         cls.show(content)
 
     @classmethod
@@ -145,15 +172,15 @@ class Display(object):
         """
 
         content = []
-        for host, auth, jump in rows:
+        for name, auth, host, jump in rows:
             jump_server = ""
             if jump is not None:
-                jump_server = "=> {}".format(jump.signature())
+                jump_server = " => {}".format(jump.signature())
             record = VERTICAL_LIST_TEMPLATE.format(
                        sig=auth.signature(), host=host, ip=auth.get_host_ip4(),
                        port=auth.get_port(), proto=auth.get_scheme(),
                        user=auth.get_user(), nr=len(content) + 1,
-                       jump_server=jump_server)
+                       name=name, jump_server=jump_server)
             content.append(record)
         cls.show(content)
 
@@ -179,47 +206,58 @@ class Display(object):
                 Log.warn(ignore_message.format("/".join(ignore_items)))
             return cls.show_list_view_vertical(rows)
         headers = {
-            "sig": "hash",
+            "auth_sig": "hash",
+            "jump_sig": "bounce",
             "ip4": "ipv4",
             "port": "port",
             "user": "user",
             "proto": "protocol",
-            "host": "hostname"
+            "host": "hostname",
+            "name": "friendly name",
         }
         records = []
-        max_host_len, max_user_len = len(headers["host"]), len(headers["user"])
-        for host, auth, jump in rows:
+        max_host_len = len(headers["host"])
+        max_user_len = len(headers["user"])
+        max_name_len = len(headers["name"])
+        for name, auth, host, jump in rows:
+            if len(name) > max_name_len:
+                max_name_len = len(name)
             if len(host) > max_host_len:
                 max_host_len = len(host)
             if len(auth.get_user()) > max_user_len:
                 max_user_len = len(auth.get_user())
             records.append({
-                "sig": auth.signature(),
+                "auth_sig": auth.signature(),
+                "jump_sig": jump.signature() if jump is not None else "self",
                 "ip4": auth.get_host_ip4(),
                 "port": auth.get_port(),
                 "user": auth.get_user(),
                 "proto": auth.get_scheme(),
                 "host": host,
+                "name": name,
                 "jump": jump is not None
             })
         line = ["{proto:^8}", "{ip4:^15}", "{port:^5}"]
         line.append("{host:^%s}" % max_host_len)
         line.append("{user:^%s}" % max_user_len)
-        line_template = u" {sig:^10} %s " + u" | ".join(line)
-        content = [cls.bind_params(line_template).format(**headers)]
+        line.append("{name:^%s}" % max_name_len)
+        line_tpl = u" {auth_sig:^10} | {jump_sig:^10} %s " + u" | ".join(line)
+        content = [cls.bind_params(line_tpl).format(**headers)]
         separator = {
-            "sig": 10,
+            "auth_sig": 10,
+            "jump_sig": 10,
             "ip4": 15,
             "port": 5,
             "user": max_user_len,
             "proto": 8,
+            "name": max_name_len,
             "host": max_host_len
         }
         for k, v in separator.iteritems():
             separator[k] = str(v * "=")
-        content.append(cls.bind_params(line_template).format(**separator))
+        content.append(cls.bind_params(line_tpl).format(**separator))
         for record in records:
-            row = cls.bind_params(line_template, record.get("jump"))
+            row = cls.bind_params(line_tpl, record.get("jump"))
             content.append(row.format(**record))
         content.append(cls.LINE_SEPARATOR)
         if len(records) == 0:
@@ -239,3 +277,16 @@ class Display(object):
         """
 
         return line_template % (u"\u2514" if subparam else "|")
+
+    @classmethod
+    def show_dump(cls, passkey_dump):
+        """Vulnerable passkey dump to stdout.
+
+        Args:
+            passkey_dump (str): Base64 passkey dump with type as prefix.
+
+        Outputs:
+            stdout: Base64 encoded passkey.
+        """
+
+        stdout.write(passkey_dump.strip())

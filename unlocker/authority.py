@@ -51,6 +51,8 @@ class Authority(object):
     MIN_PORT, MAX_PORT = 1, (2**16)-1
     MAX_USER_LEN = 32
     DELIMITER, COMPONENTS = ":", 3
+    HUMAN_READABLE_FORMAT = "{scheme}://{user}@{ipv4}:{port}"
+    COMPONENTS_FORMAT = "{host}:{port}:{user}:{scheme}"
 
     def __init__(self):
         self.host, self.port, self.user = None, None, None
@@ -100,7 +102,7 @@ class Authority(object):
             self.ip_addr = unicode(gethostbyname(host))
             Log.debug("Resolved hostname to IP {ip}", ip=self.ip_addr)
         except Exception as e:
-            Log.warn("Cannot resolve hostname: {e}", e=str(e))
+            Log.warn("Cannot resolve hostname {h}: {e}", e=str(e), h=host)
         try:
             self.host = int(ip_address(self.ip_addr))
             Log.debug("Parsing host as {ip}", ip=self.host)
@@ -198,9 +200,12 @@ class Authority(object):
         """
 
         if human_readable:
-            return "{}@{}:{}".format(self.user, self.get_host_ip4(), self.port)
-        return "{}:{}:{}:{}".format(self.host, self.port, self.user,
-                                    self.scheme)
+            return self.HUMAN_READABLE_FORMAT.format(
+                user=self.user, ipv4=self.get_host_ip4(), port=self.port,
+                scheme=self.scheme)
+        return self.COMPONENTS_FORMAT.format(
+                host=self.host, port=self.port, user=self.user,
+                scheme=self.scheme)
 
     def signature(self):
         """Find the CRC32 hash of current authority.
@@ -212,7 +217,7 @@ class Authority(object):
         return hex(crc32(self.read()) & 0xFFFFFFFF)[2:]  # skip 0x
 
     def __repr__(self):
-        return self.read()
+        return "[{} {}]".format(self.signature(), self.read(True))
 
     @classmethod
     def new(cls, host, port, user, scheme=None):
