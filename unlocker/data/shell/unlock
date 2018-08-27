@@ -1,9 +1,13 @@
-if [ -z $HOME ]; then
+if [ "x$DEBUG" = "x*" ]; then
+    set -x
+fi
+
+if [ -z "$HOME" ]; then
     echo "Cannot find your user's home directory..."
     exit 1
 fi
 
-SECRETS=$HOME/.unlocker/.secrets
+SECRETS="$HOME/.unlocker/.secrets"
 LOCKED_SECRETS="$SECRETS.lock"
 
 if [ "x$1" = "xhelp" ]; then
@@ -38,27 +42,27 @@ if [ "x$1" = "xhelp" ]; then
     exit 0
 fi
 
-if [ $(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l) = "1" ]; then
+if [ "$(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l)" = "1" ]; then
     if ! [ -x "$(command -v gpg)" ]; then
         echo "Cannot decrypt secrets..."
         echo "Please install gpg and try again"
         echo "Closing..."
         exit 1
     fi
-    gpg -o $SECRETS --decrypt $LOCKED_SECRETS
+    gpg -o "$SECRETS" --decrypt "$LOCKED_SECRETS"
     if [ $? != "0" ]; then
         echo "Failed to decrypt secrets..."
         echo "Closing..."
         exit 1
     fi
-    rm -f $LOCKED_SECRETS
-    if [ -z $1 ]; then
+    rm -f "$LOCKED_SECRETS"
+    if [ -z "$1" ]; then
         echo "Secrets are now unlocked"
         exit 0
     fi
 fi
 
-if [ $(ls -l $SECRETS 2> /dev/null | wc -l) = "0" ]; then
+if [ "$(ls -l $SECRETS 2> /dev/null | wc -l)" = "0" ]; then
     echo "Either unlocker has not been initialized, either secrets are missing"
     echo "Try unlock help and unlocker -h"
     echo "Closing..."
@@ -70,7 +74,7 @@ is_installed ()
     if [ "x$1" = "x?" ]; then
         shift
     fi
-    if [ -z $1 ]; then
+    if [ -z "$1" ]; then
         echo "Missing service to check if is installed..."
         exit 2
     elif ! [ -x "$(command -v $1)" ]; then
@@ -101,9 +105,19 @@ get_private_key ()
     echo $1 | sed -En 's/^privatekey (.*)/\1/pg' | python -m base64 -d
 }
 
-unlock_service ()
+init ()
 {
     mkdir -p /tmp/.unlocker
+}
+
+clean ()
+{
+    rm -rf /tmp/.unlocker
+}
+
+unlock_service ()
+{
+    init
     case $1 in
         ssh) {
             params=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/\1@\2 -p\3/gp')
@@ -156,14 +170,16 @@ unlock_service ()
                     exit 1
                 fi
                 secret_file=/tmp/.unlocker/$(date +%s).pk
-                get_private_key $passkey | tee $secret_file > /dev/null
+                get_private_key "$passkey" | tee $secret_file > /dev/null
                 chmod 0400 $secret_file
                 params="-i $secret_file $params"
                 is_installed ? ssh
                 ssh $params
             else
                 is_installed ? sshpass
-                SSHPASS="$password" sshpass -e ssh $params
+                export SSHPASS="$password"
+                sshpass -e ssh $params
+                unset SSHPASS
             fi
         }
         ;;
@@ -252,16 +268,16 @@ unlock_service ()
         }
         ;;
     esac
-    rm -rf /tmp/.unlocker
+    clean
 }
 
-if [ -z $1 ]; then
+if [ -z "$1" ]; then
     echo "Nothing to unlock (try help)"
     echo "Closing..."
     exit 1
 fi
 
-if [ -z $2 ]; then
+if [ -z "$2" ]; then
     echo "Server address required (try help)"
     echo "Closing..."
     exit 1
@@ -269,14 +285,14 @@ fi
 
 cleanup ()
 {
-    rm -rf /tmp/.unlocker
+    clean
     echo "Closing..."
     exit 0
 }
 
-is_installed ? python
-is_installed ? pip
-is_installed ? unlocker
+for app in python pip unlocker; do
+    is_installed ? $app
+done
 
 trap cleanup 2 3
 

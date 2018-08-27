@@ -100,12 +100,10 @@ class Authority(object):
             Log.fatal("Invalid host: expected string, got {x}", x=type(host))
         try:
             self.ip_addr = unicode(gethostbyname(host))
-            Log.debug("Resolved hostname to IP {ip}", ip=self.ip_addr)
         except Exception as e:
             Log.warn("Cannot resolve hostname {h}: {e}", e=str(e), h=host)
         try:
             self.host = int(ip_address(self.ip_addr))
-            Log.debug("Parsing host as {ip}", ip=self.host)
         except Exception as e:
             Log.fatal("Invalid host: {e}", e=str(e))
 
@@ -135,7 +133,6 @@ class Authority(object):
         if port < self.MIN_PORT or port > self.MAX_PORT:
             Log.fatal("Invalid port: out of range {port}", port=port)
         self.port = port
-        Log.debug("Parsing port as {port}", port=port)
 
     def get_user(self):
         """Authority user getter.
@@ -163,7 +160,6 @@ class Authority(object):
         if len(user) > self.MAX_USER_LEN:
             Log.fatal("Invalid user: max length exceeded {v}", v=len(user))
         self.user = user
-        Log.debug("Parsing user as {user}", user=user)
 
     def get_scheme(self):
         """Authority scheme getter.
@@ -190,7 +186,6 @@ class Authority(object):
         if len(scheme) == 0:
             Log.fatal("Invalid scheme: zero-length string not allowed")
         self.scheme = scheme
-        Log.debug("Parsing scheme as {scheme}", scheme=scheme)
 
     def read(self, human_readable=False):
         """Read authority representation.
@@ -211,13 +206,28 @@ class Authority(object):
         """Find the CRC32 hash of current authority.
 
         Returns:
-            str: Hex value without 0x of the calculated CRC32.
+            str: Calculated CRC for current authority.
         """
 
-        return hex(crc32(self.read()) & 0xFFFFFFFF)[2:]  # skip 0x
+        return self.__class__.sign(self.read())
 
     def __repr__(self):
         return "[{} {}]".format(self.signature(), self.read(True))
+
+    @classmethod
+    def sign(cls, data):
+        """Calculate CRC32 hash of given data.
+
+        Args:
+            data (str): String data to calculate CRC.
+
+        Returns:
+            str: Hex value without 0x of the calculated CRC32.
+        """
+
+        if not isinstance(data, (str, unicode)):
+            Log.fatal("Cannot calculate CRC for non-string data")
+        return hex(crc32(data) & 0xFFFFFFFF)[2:]  # skip 0x
 
     @classmethod
     def new(cls, host, port, user, scheme=None):
@@ -242,7 +252,6 @@ class Authority(object):
         auth.set_user(user)
         if scheme is not None:
             auth.set_scheme(scheme)
-        Log.debug("Created new authority... {this}", this=auth)
         return auth
 
     @classmethod

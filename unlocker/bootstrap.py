@@ -39,10 +39,12 @@ def unlocker(secrets, args=()):
 
     # register secrets on keychain
     Manager.initialize(secrets)
+    Log.debug("Preparing to boot...")
 
     # initialize manager and parse arguments
     mng = Manager(*args)
     mng.call()
+    Log.debug("Preparing to exit...")
 
 
 def read_input():
@@ -53,11 +55,13 @@ def read_input():
 
     # check if data is piped to unlocked and dump passkey
     if StreamData.read():
+        Log.debug("Reading stdin...")
         return StreamData.OPTION, StreamData.parse(Service)
 
     # initialize shell
     shell = ShellParser()
     opts, args = shell.get_args()
+    Log.debug("Running '{o}' with arguments: {a}", o=opts, a=args)
 
     # return shell arguments
     return opts, vars(args)
@@ -72,6 +76,7 @@ def main():
 
     # configure log
     Log.configure()
+    Log.debug("Running in debug mode...")
 
     # read input
     args = read_input()

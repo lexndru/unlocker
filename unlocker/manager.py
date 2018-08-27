@@ -183,7 +183,9 @@ class Manager(object):
             str: Random 16 characters.
         """
 
-        return uuid4().hex[:16]
+        name = uuid4().hex[:16]
+        Log.debug("Generating new random name: {n}", n=name)
+        return name
 
     def call(self):
         """Call dispatcher.
@@ -197,6 +199,8 @@ class Manager(object):
         if self.option not in self.supported_options:
             Log.fatal("Unsupported option {o}", o=self.option)
         access = self.supported_options[self.option]
+        debug_message = "Calling option {opt} with access level {acc}"
+        Log.debug(debug_message, opt=self.option, acc=access)
         method = "call_{}_{}_option".format(access, self.option)
         if not hasattr(self, method):
             error = "Unsupported method {option} or access rights {access}"
@@ -218,11 +222,15 @@ class Manager(object):
             stdout: Human-readable passkey with authority details and hostname.
         """
 
+        Log.debug("Searching secret passkey for key {s}", s=signature)
         if len(signature) == self.MIN_NAME_LEN:
+            Log.debug("Trying key as authority signature...")
             for name, auth, _, _ in self.get_db().query_all():
                 if auth.signature() == signature:
+                    Log.debug("Got authority with signature {s}", s=signature)
                     signature = name
                     break
+        Log.debug("Running a lookup for named authority: {n}", n=signature)
         self.call_read_only_lookup_option(signature)
 
     def call_read_write_forget_option(self, signature, **kwargs):
@@ -240,11 +248,15 @@ class Manager(object):
             stdout: Human-readable passkey with authority details and hostname.
         """
 
+        Log.debug("Testing if key {s} exists", s=signature)
         if len(signature) == self.MIN_NAME_LEN:
+            Log.debug("Trying key as authority signature...")
             for name, auth, _, _ in self.get_db().query_all():
                 if auth.signature() == signature:
+                    Log.debug("Got authority with signature {s}", s=signature)
                     signature = name
                     break
+        Log.debug("Running cleanup after named authority: {n}", n=signature)
         self.call_read_write_remove_option(signature)
 
     def call_read_write_update_option(self, name, auth, jump_server=None,
@@ -262,15 +274,20 @@ class Manager(object):
             stdout: Confirm message with human-readable authority details.
         """
 
+        Log.debug("Incoming update request for named authority {n}", n=name)
         if not self.get_db().exists(name):
+            Log.debug("Named authority is not found...")
             error = "Cannot update entry: \"{name}\" not found in " \
                     "keychain (missing key)"
             Log.fatal(error, name=name)
         if jump_server is not None:
+            Log.debug("Update requests to change jump server...")
             jump_auth = self.build_authority_from_signature(jump_server)
             self.get_db().update_jump_auth(name, jump_auth)
+            Log.debug("New jump set to authority: {a}", a=str(jump_auth))
         passkey = Passkey.resolve(auth)
         self.get_db().update_passkey(name, passkey)
+        Log.debug("New passkey set ... ")
         Display.show_update(self.get_db().fetch_auth(name))
 
     def call_read_write_append_option(self, name, host, port, user, auth,
@@ -293,9 +310,10 @@ class Manager(object):
             stdout: Confirm message with human-readable authority details.
         """
 
+        Log.debug("Incoming append request...")
         if name is None:
             name = self.build_random_name()
-            Log.warn("Generated random name: {n}", n=name)
+            Log.warn("Named authority is known as: {n}", n=name)
         elif len(name) <= self.MIN_NAME_LEN:
             error = "Possible lookup collision: entry name is too short " \
                     "(name must be greater than {size} characters)"
@@ -308,13 +326,14 @@ class Manager(object):
             "name": name,
             "host": host,
             "auth": self.build_authority_from_args(user, host, port, scheme),
-            "passkey": Passkey.resolve(auth),
         }
         if jump_server is not None:
             data.update({
                 "jump_auth": self.build_authority_from_signature(jump_server)
             })
-        self.get_db().add(**data)
+        Log.debug("Preparing to add {args}", args=data)
+        self.get_db().add(passkey=Passkey.resolve(auth), **data)
+        Log.debug("New named authority is saved...")
         Display.show_append(data.get("auth"))
 
     def call_read_write_remove_option(self, name, **kwargs):
@@ -330,21 +349,29 @@ class Manager(object):
             stdout: Human-readable passkey with authority details and hostname.
         """
 
+        Log.debug("Incoming remove request for named authority {n}", n=name)
         if not self.get_db().exists(name):
+            Log.debug("Nothing to remove...")
             error = "Cannot remove entry: \"{name}\" not found in " \
                     "keychain (missing key)"
             Log.fatal(error, name=name)
+        Log.debug("Fetching data for named authority...")
         auth, host, secret = self.get_db().lookup(name)
         dependents = []
         for jump, dep_name in self.get_db().query_jump():
             if jump.signature() == auth.signature():
+                debug_message = "Found another authority {a} " \
+                                "depending on this... "
+                Log.debug(debug_message, a=str(jump))
                 dependents.append(dep_name)
         if len(dependents) > 0:
             error = "Not removing entry because {n} other servers bounce of " \
                     "\"{name}\": remove all before trying again (safe mode)"
             Log.fatal(error, n=len(dependents), name=name)
         passtype, passkey = Passkey.copy(secret, True)
+        Log.debug("Removing named authority...")
         self.get_db().remove(name)  # remove all keys for named auth
+        Log.debug("Permanently removed named authority {n}", n=name)
         Display.show_remove(auth, host, passtype, passkey)
 
     def call_read_only_lookup_option(self, name, **kwargs):
@@ -360,12 +387,16 @@ class Manager(object):
             stdout: Human-readable passkey with authority details and hostname.
         """
 
+        Log.debug("Incoming lookup request for named authority {n}", n=name)
         if not self.get_db().exists(name):
+            Log.debug("Nothing to lookup...")
             error = "Cannot lookup entry: \"{name}\" not found in " \
                     "keychain (missing key)"
             Log.fatal(error, name=name)
+        Log.debug("Fetching data for named authority...")
         auth, host, secret = self.get_db().lookup(name)
         passtype, passkey = Passkey.copy(secret, True)
+        Log.debug("Printing as safe as possible {n}'s secrets...", n=name)
         Display.show_lookup(auth, host, passtype, passkey)
 
     def call_read_only_list_option(self, *args, **kwargs):
@@ -375,10 +406,12 @@ class Manager(object):
             stdout: Pager with table-like view of all hostnames.
         """
 
+        Log.debug("Incoming list request...")
         known_hosts = [e for e in self.get_db().query_all()]
         counter = -1
         indexes = {}
         sorted_hosts = []
+        Log.debug("Found {n} hosts to list...", n=len(known_hosts))
         while len(known_hosts) > 0:
             if counter >= self.MAX_ITER_LIST:
                 Log.fatal("Max. iteration over list display reached...")
@@ -394,6 +427,7 @@ class Manager(object):
                 sorted_hosts.insert(jump_index+1, known_hosts.pop(0))
                 continue
             known_hosts.insert(len(known_hosts), known_hosts.pop(0))
+        Log.debug("Sorted all known hosts and now preparing to print out...")
         Display.show_list_view(sorted_hosts, **self.args)
 
     def call_read_write_migrate_option(self, *args, **kwargs):
@@ -411,6 +445,7 @@ class Manager(object):
             stdout: Compressed exported stored secrets.
         """
 
+        Log.debug("Incoming migrate request...")
         Migrate.discover(self)
         Log.debug("Migrated data...")
 
@@ -418,6 +453,7 @@ class Manager(object):
         """Dump all keys from keychain in debug mode.
         """
 
+        Log.debug("Incoming debug dump request...")
         for key in keys:
             for k in self.get_secrets().lookup(key):
                 key_type = self.get_db().which(k)
@@ -430,6 +466,7 @@ class Manager(object):
         Can corrupt keychain! (Very unsafe)
         """
 
+        Log.debug("Incoming debug purge request...")
         for key in keys:
             Log.debug("Attempt to remove {k} ...", k=key)
             removed_key = self.get_secrets().remove(key)
@@ -454,10 +491,14 @@ class Manager(object):
             Exception: If unsupported passkey is found.
         """
 
+        Log.debug("Incoming secret dump request...")
         passkey = ""  # dummy passkey
         auth = self.build_authority_from_args(user, host, port, scheme)
+        Log.debug("Found {a} authority...", a=str(auth))
         for each, name in self.get_db().query_auth():
             if each.signature() == auth.signature():
+                Log.debug("Records matched authority, got passkey...")
                 _, _, secret = self.get_db().lookup(name)
                 passkey = "{}\n{}".format(*Passkey.copy(secret))
+        Log.debug("Printing passkey..." if passkey else "Nothing to print...")
         Display.show_dump(passkey)

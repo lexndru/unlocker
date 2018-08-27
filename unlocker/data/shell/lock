@@ -1,9 +1,13 @@
-if [ -z $HOME ]; then
+if [ "x$DEBUG" = "x*" ]; then
+    set -x
+fi
+
+if [ -z "$HOME" ]; then
     echo "Cannot find your user's home directory..."
     exit 1
 fi
 
-SECRETS=$HOME/.unlocker/.secrets
+SECRETS="$HOME/.unlocker/.secrets"
 LOCKED_SECRETS="$SECRETS.lock"
 
 if [ "x$1" = "xhelp" ]; then
@@ -39,15 +43,15 @@ if ! [ -x "$(command -v gpg)" ]; then
     exit 1
 fi
 
-if [ $(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l) = "0" ]; then
-    gpg -o $LOCKED_SECRETS --symmetric --cipher-algo AES256 $SECRETS
+if [ "$(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l)" = "0" ]; then
+    gpg -o "$LOCKED_SECRETS" --symmetric --cipher-algo AES256 "$SECRETS"
     if [ $? != "0" ]; then
         echo "Failed to encrypt secrets..."
         echo "Closing..."
         exit 1
     fi
     echo "Secrets are now encrypted!"
-    rm -f $SECRETS
+    rm -f "$SECRETS"
 else
     echo "Secrets are already encrypted"
 fi

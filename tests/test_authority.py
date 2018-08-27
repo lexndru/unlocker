@@ -31,7 +31,7 @@ class TestAuthority(TestCase):
     def setUp(self):
         self.auth = Authority()
         self.localhost_as_int = 2130706433
-        self.localhost_signature = "17fdca41"  # 127.0.0.1:22:root:ssh
+        self.localhost_signature = Authority.sign("2130706433:22:root:ssh")
 
     def test_host(self):
         self.assertIsNone(self.auth.get_host())

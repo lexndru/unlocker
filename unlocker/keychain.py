@@ -38,6 +38,7 @@ class Keychain(object):
 
     def __init__(self, holder):
         self.keychain = holder
+        Log.debug("Keychain initialized...")
 
     def add(self, key, value):
         """Append key to keychain.

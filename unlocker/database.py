@@ -49,6 +49,7 @@ class Database(object):
         if not isinstance(storage, Keychain):
             Log.fatal("Unexpected database storage {t}", t=type(storage))
         self.storage = storage
+        Log.debug("Database initialized... {k}", k=str(storage))
 
     def exists(self, name):
         """Tests whether a named authority exists in keychain.

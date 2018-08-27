@@ -23,8 +23,6 @@
 from sys import argv, stdin
 from re import compile, UNICODE
 
-from unlocker.manager import Manager
-
 from unlocker.util.log import Log
 
 

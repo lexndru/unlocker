@@ -122,4 +122,4 @@ RUN pip install -r requirements.txt && python setup.py test && python setup.py i
 
 ENV DEBUG true
 
-CMD ["unlocker", "init"]
+CMD ["unlocker", "install"]
