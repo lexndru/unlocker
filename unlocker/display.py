@@ -276,7 +276,7 @@ class Display(object):
             str: Template string to be formated.
         """
 
-        return line_template % (u"\u2514" if subparam else "|")
+        return line_template % "|"
 
     @classmethod
     def show_dump(cls, passkey_dump):

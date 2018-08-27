@@ -115,19 +115,51 @@ clean ()
     rm -rf /tmp/.unlocker
 }
 
+get_credentials ()
+{
+    export NOPAGER=true
+    for line in "$(unlocker list | grep -E "$1 .* $2")"; do
+        args=""
+        user="$(echo $line | cut -d "|" -f 7 | tr -d " ")"
+        if [ ! -z "$user" ]; then
+            args="${args}$user@$2"
+        else
+            args="${args}$2"
+        fi
+        port="$(echo $line | cut -d "|" -f 5 | tr -d " ")"
+        if [ ! -z "$port" ]; then
+            args="${args}:$port"
+        fi
+        echo $args
+    done
+    unset NOPAGER
+}
+
 unlock_service ()
 {
     init
-    case $1 in
+    PROTOCOL=$1
+    ADDRESS=$2
+    case $PROTOCOL in
         ssh) {
-            params=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/\1@\2 -p\3/gp')
+            passkey=$(get_passkey ssh://$ADDRESS)
+            if [ -z "$passkey" ]; then
+                echo "Testing all possible credentials..."
+                for addr in "$(get_credentials $PROTOCOL $ADDRESS)"; do
+                    passkey=$(get_passkey ssh://$addr)
+                    if [ ! -z "$passkey" ]; then
+                        ADDRESS=$addr
+                        break
+                    fi
+                done
+            fi
+            params=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/\1@\2 -p\3/gp')
             if [ -z "$params" ]; then
-                params=$2
+                params=$ADDRESS
             fi
             if [ "x$DEBUG" = "xssh" -o "x$DEBUG" = "x*" ]; then
                 params="-v $params"
             fi
-            passkey=$(get_passkey ssh://$2)
             if [ -z "$passkey" ]; then
                 echo "Cannot unlock server because passkey is missing..."
                 echo "Recovering..."
@@ -139,9 +171,13 @@ unlock_service ()
                 echo "  2) I have a privatekey"
                 echo ""
                 read -p "Type number: " auth
-                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
+                args=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
                 if [ -z "$args" ]; then
-                    args=$(echo $2 | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 22/pg')
+                    args=$(echo $ADDRESS | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 22/pg')
+                    if [ -z "$args" ]; then
+                        get_credentials $PROTOCOL $ADDRESS
+                        args="-h $ADDRESS -p 22"
+                    fi
                 fi
                 case $auth in
                     1) {
@@ -159,18 +195,18 @@ unlock_service ()
                     ;;
                 esac
                 unlocker append $args
-                passkey=$(get_passkey ssh://$2)
+                passkey=$(get_passkey ssh://$ADDRESS)
             fi
             password=$(get_password "$passkey")
             if [ -z "$password" ]; then
                 privatekey=$(get_private_key "$passkey")
                 if [ -z "$privatekey" ]; then
-                    echo "Cannot understand authentification method for $2"
+                    echo "Cannot understand authentification method for $ADDRESS"
                     echo "It may not be supported by unlocker or it may corrupted"
                     exit 1
                 fi
                 secret_file=/tmp/.unlocker/$(date +%s).pk
-                get_private_key "$passkey" | tee $secret_file > /dev/null
+                echo "$privatekey" > $secret_file
                 chmod 0400 $secret_file
                 params="-i $secret_file $params"
                 is_installed ? ssh
@@ -184,30 +220,30 @@ unlock_service ()
         }
         ;;
         mysql) {
-            params=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-h\2 -P\3 -u\1/gp')
+            params=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/-h\2 -P\3 -u\1/gp')
             if [ -z "$params" ]; then
-                params=$(echo $2 | sed -En 's/(.+)@(.+)/-h\2 -u\1/gp')
+                params=$(echo $ADDRESS | sed -En 's/(.+)@(.+)/-h\2 -u\1/gp')
             fi
             if [ "x$DEBUG" = "xmysql" -o "x$DEBUG" = "x*" ]; then
                 params="-v $params"
             fi
-            passkey=$(get_passkey mysql://$2)
+            passkey=$(get_passkey mysql://$ADDRESS)
             if [ -z "$passkey" ]; then
                 echo "Cannot unlock server because passkey is missing..."
                 echo "Recovering..."
                 echo "Press any key to continue adding a password and store it for later"
                 echo "use, otherwise exit with ^C or add it to unlocker manually"
                 read -p "" anykey
-                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
+                args=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
                 if [ -z "$args" ]; then
-                    args=$(echo $2 | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 3306/pg')
+                    args=$(echo $ADDRESS | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 3306/pg')
                 fi
                 unlocker append $args -a password
-                passkey=$(get_passkey mysql://$2)
+                passkey=$(get_passkey mysql://$ADDRESS)
             fi
             password=$(get_password "$passkey")
             if [ -z "$password" ]; then
-                echo "Cannot understand authentification method for $2"
+                echo "Cannot understand authentification method for $ADDRESS"
                 echo "It may not be supported by unlocker or it may corrupted"
                 exit 1
             else
@@ -218,36 +254,36 @@ unlock_service ()
         }
         ;;
         redis) {
-            params=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-h \2 -p \3/gp')
+            params=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/-h \2 -p \3/gp')
             if [ -z "$params" ]; then
-                params=$(echo $2 | sed -En 's/(.+):(.+)/-h \1 -p \2/gp')
+                params=$(echo $ADDRESS | sed -En 's/(.+):(.+)/-h \1 -p \2/gp')
                 if [ -z "$params" ]; then
-                    params="-h $2"
+                    params="-h $ADDRESS"
                 fi
             fi
             if [ "x$DEBUG" = "xredis" -o "x$DEBUG" = "x*" ]; then
                 echo "Unlocker doesn't support verbose mode for Redis"
             fi
-            passkey=$(get_passkey redis://_@$2)
+            passkey=$(get_passkey redis://_@$ADDRESS)
             if [ -z "$passkey" ]; then
                 echo "Cannot unlock server because passkey is missing..."
                 echo "Recovering..."
                 echo "Press any key to continue adding a password and store it for later"
                 echo "use, otherwise exit with ^C or add it to unlocker manually"
                 read -p "" anykey
-                args=$(echo $2 | sed -En 's/(.+)@(.+):(.+)/-h \2 -p \3/pg')
+                args=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/-h \2 -p \3/pg')
                 if [ -z "$args" ]; then
-                    args=$(echo $2 | sed -En 's/(.+):(.+)/-h \1 -p \2/pg')
+                    args=$(echo $ADDRESS | sed -En 's/(.+):(.+)/-h \1 -p \2/pg')
                     if [ -z "$args" ]; then
-                        args="-h $2 -p 6379"
+                        args="-h $ADDRESS -p 6379"
                     fi
                 fi
                 unlocker append $args -a password -u _
-                passkey=$(get_passkey redis://_@$2)
+                passkey=$(get_passkey redis://_@$ADDRESS)
             fi
             password=$(get_password "$passkey")
             if [ -z "$password" ]; then
-                echo "Cannot understand authentification method for $2"
+                echo "Cannot understand authentification method for $ADDRESS"
                 echo "It may not be supported by unlocker or it may corrupted"
                 exit 1
             else
@@ -258,9 +294,9 @@ unlock_service ()
         }
         ;;
         *) {
-            is_installed ? $1
+            is_installed ? $PROTOCOL
             if [ $? != 0 ]; then
-                echo "$1 is installed on your system, but is not supported by Unlocker"
+                echo "$PROTOCOL is installed on your system, but is not supported by Unlocker"
                 echo "Help by submitting an implementation or a request at $HOMEPAGE"
                 echo "Closing..."
                 exit 1
@@ -290,7 +326,7 @@ cleanup ()
     exit 0
 }
 
-for app in python pip unlocker; do
+for app in cat wc grep sed tr cut tee python pip unlocker; do
     is_installed ? $app
 done
 

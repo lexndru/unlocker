@@ -55,7 +55,7 @@ def read_input():
 
     # check if data is piped to unlocked and dump passkey
     if StreamData.read():
-        Log.debug("Reading stdin...")
+        Log.debug("Reading stdin: {data}", data=StreamData.buf_in)
         return StreamData.OPTION, StreamData.parse(Service)
 
     # initialize shell
