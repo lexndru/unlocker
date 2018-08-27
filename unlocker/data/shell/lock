@@ -43,7 +43,8 @@ if ! [ -x "$(command -v gpg)" ]; then
     exit 1
 fi
 
-if [ "$(ls -l $LOCKED_SECRETS 2> /dev/null | wc -l)" = "0" ]; then
+IS_LOCKED=$(ls -l "$LOCKED_SECRETS" 2> /dev/null | wc -l)
+if [ "$IS_LOCKED" = "0" ]; then
     gpg -o "$LOCKED_SECRETS" --symmetric --cipher-algo AES256 "$SECRETS"
     if [ $? != "0" ]; then
         echo "Failed to encrypt secrets..."
