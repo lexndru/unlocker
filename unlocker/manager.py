@@ -95,7 +95,7 @@ class Manager(object):
     }
 
     MAX_ITER_LIST = 2**16
-    MIN_NAME_LEN = 8
+    MIN_NAME_LEN, MAX_NAME_LEN = 10, 42  # meaning of life
 
     def __init__(self, option, args):
         self.option = option
@@ -223,7 +223,7 @@ class Manager(object):
         """
 
         Log.debug("Searching secret passkey for key {s}", s=signature)
-        if len(signature) == self.MIN_NAME_LEN:
+        if len(signature) < self.MIN_NAME_LEN:
             Log.debug("Trying key as authority signature...")
             for name, auth, _, _ in self.get_db().query_all():
                 if auth.signature() == signature:
@@ -249,7 +249,7 @@ class Manager(object):
         """
 
         Log.debug("Testing if key {s} exists", s=signature)
-        if len(signature) == self.MIN_NAME_LEN:
+        if len(signature) < self.MIN_NAME_LEN:
             Log.debug("Trying key as authority signature...")
             for name, auth, _, _ in self.get_db().query_all():
                 if auth.signature() == signature:
@@ -314,10 +314,14 @@ class Manager(object):
         if name is None:
             name = self.build_random_name()
             Log.warn("Named authority is known as: {n}", n=name)
-        elif len(name) <= self.MIN_NAME_LEN:
+        elif len(name) < self.MIN_NAME_LEN:
             error = "Possible lookup collision: entry name is too short " \
-                    "(name must be greater than {size} characters)"
+                    "(name must be at least {size} characters)"
             Log.fatal(error, size=self.MIN_NAME_LEN)
+        elif len(name) > self.MAX_NAME_LEN:
+            error = "Possible bad naming: entry name is too long " \
+                    "(name must be at most {size} characters)"
+            Log.fatal(error, size=self.MAX_NAME_LEN)
         elif self.get_db().exists(name):
             error = "Another entry with the same name exists: {name} " \
                     "(name must be unique)"
@@ -474,15 +478,12 @@ class Manager(object):
                 Log.debug("Removed {k} ...", k=key)
         Log.debug("Closing...")
 
-    def call_secret_read_stdout_dump_option(self, host, user, port, scheme,
-                                            **kwargs):
+    def call_secret_read_stdout_dump_option(self, name, signature, **kwargs):
         """Vulnerable passkey dump to stdout.
 
         Args:
-            host   (str): Host to attach to authority.
-            port   (int): Port number to attach to authority.
-            user   (str): Username to attach to authority.
-            scheme (str): Scheme of the connection.
+            name      (str): The name of the authority to lookup.
+            signature (str): The signature for an authority to find its name.
 
         Outputs:
             stdout: Base64 encoded passkey.
@@ -491,14 +492,21 @@ class Manager(object):
             Exception: If unsupported passkey is found.
         """
 
-        Log.debug("Incoming secret dump request...")
+        def print_passkey(auth_name):
+            _, _, secret = self.get_db().lookup(auth_name)
+            return "{}\n{}".format(*Passkey.copy(secret))
+
         passkey = ""  # dummy passkey
-        auth = self.build_authority_from_args(user, host, port, scheme)
-        Log.debug("Found {a} authority...", a=str(auth))
-        for each, name in self.get_db().query_auth():
-            if each.signature() == auth.signature():
+        Log.debug("Incoming secret dump request...")
+        if len(name) > 0:
+            Log.debug("Got named authority {n}...", n=name)
+            passkey = print_passkey(name)
+        elif len(signature) > 0:
+            for each, name in self.get_db().query_auth():
+                if each.signature() != signature:
+                    continue
                 Log.debug("Records matched authority, got passkey...")
-                _, _, secret = self.get_db().lookup(name)
-                passkey = "{}\n{}".format(*Passkey.copy(secret))
+                passkey = print_passkey(name)
+                break  # exit on first match
         Log.debug("Printing passkey..." if passkey else "Nothing to print...")
         Display.show_dump(passkey)

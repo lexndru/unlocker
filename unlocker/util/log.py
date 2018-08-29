@@ -34,7 +34,7 @@ class Log(object):
 
     @classmethod
     def configure(cls, verbose=False):
-        if verbose or os.environ.get("DEBUG") is not None:
+        if "DEBUG" in os.environ or verbose:
             cls.config["level"] = logging.DEBUG
         else:
             cls.config["level"] = logging.WARNING
@@ -68,5 +68,8 @@ class Log(object):
     @classmethod
     def fatal(cls, message, **kwargs):
         error = cls.text_fmt(message, kwargs)
-        throw = SystemExit if os.environ.get("DEBUG") is None else Exception
+        if os.environ.get("DEBUG") == "true":
+            throw = Exception
+        else:
+            throw = SystemExit
         raise throw(error)

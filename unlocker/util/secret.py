@@ -46,7 +46,7 @@ def confidential(func):
 
         # Launch callable with secret arguments
         try:
-            if environ.get("DEBUG") is None:
+            if "DEBUG" not in environ:
                 try:
                     func(db, **kwargs)
                 except Exception as e:

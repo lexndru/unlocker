@@ -20,13 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from unlocker.util.log import Log
-from unlocker.util.shell import ShellParser
-from unlocker.util.secret import confidential
-from unlocker.util.service import Service
-
-from unlocker.stream import StreamData
 from unlocker.manager import Manager
+from unlocker.stream import StreamData
+
+from unlocker.util.secret import confidential
+from unlocker.util.shell import ShellParser
+from unlocker.util.log import Log
 
 
 @confidential
@@ -56,7 +55,7 @@ def read_input():
     # check if data is piped to unlocked and dump passkey
     if StreamData.read():
         Log.debug("Reading stdin: {data}", data=StreamData.buf_in)
-        return StreamData.OPTION, StreamData.parse(Service)
+        return StreamData.OPTION, StreamData.parse()
 
     # initialize shell
     shell = ShellParser()

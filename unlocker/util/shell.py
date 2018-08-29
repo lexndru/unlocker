@@ -312,7 +312,7 @@ methods = {
     "get_migrate_shell": get_migrate_shell,
 }
 
-if environ.get("DEBUG") is not None:
+if "DEBUG" in environ:
     methods.update({
         "get_dump_shell": get_dump_shell,
         "get_purge_shell": get_purge_shell

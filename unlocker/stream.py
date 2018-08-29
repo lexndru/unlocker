@@ -23,11 +23,13 @@
 from sys import argv, stdin
 from re import compile, UNICODE
 
-from unlocker.util.log import Log
+from unlocker.authority import Authority
+
+from unlocker.util.service import Service
 
 
-AUTHORITY_REGEXPR = "(?:(?P<scheme>.+)://)?" \
-                    "(?:(?P<user>.+?)@)?" \
+AUTHORITY_REGEXPR = "(?:(?P<scheme>.+)://)" \
+                    "(?:(?P<user>.+?)@)" \
                     "(?P<host>[\da-zA-Z\-\.]+)" \
                     "(?:\:(?P<port>\d+))?"
 
@@ -53,30 +55,27 @@ class StreamData(object):
         if len(argv) > 1:
             return False
         if not stdin.isatty():
-            cls.buf_in = stdin.read()
+            cls.buf_in = unicode(stdin.read()).strip()
             return len(cls.buf_in) > 0
         return False
 
     @classmethod
-    def parse(cls, service):
+    def parse(cls):
         """Parse input buffer.
 
-        Args:
-            service (Service): Service instance.
-
         Returns:
-            dict: Dictionary of parsed authority.
+            dict: Dictionary with arguments.
         """
 
+        args = {"name": "", "signature": ""}
         exp = compile(AUTHORITY_REGEXPR, UNICODE)
         matches = exp.match(cls.buf_in)
         if matches is None:
-            error = "Unsupported authority, must be complied with " \
-                    "https://tools.ietf.org/html/rfc3986#section-3.2"
-            Log.fatal(error)
-        args = matches.groupdict()
-        if args.get("scheme") is None:
-            Log.fatal("Missing scheme from authority")
-        if args.get("port") is None:
-            args["port"] = service.find_port(args.get("scheme"))
+            args.update({"name": cls.buf_in})
+        else:
+            params = matches.groupdict()
+            if params.get("port") is None:
+                params["port"] = Service.find_port(params.get("scheme"))
+            auth = Authority.new(**params)
+            args.update({"signature": auth.signature()})
         return args

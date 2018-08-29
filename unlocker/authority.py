@@ -247,11 +247,14 @@ class Authority(object):
         """
 
         auth = cls()
-        auth.set_host(host)
-        auth.set_port(port)
-        auth.set_user(user)
-        if scheme is not None:
-            auth.set_scheme(scheme)
+        try:
+            if scheme is not None:
+                auth.set_scheme(scheme)
+            auth.set_host(host)
+            auth.set_port(port)
+            auth.set_user(user)
+        except Exception as e:
+            Log.fatal("Cannot create new authority: {e}", e=str(e))
         return auth
 
     @classmethod

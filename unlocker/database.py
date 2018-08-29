@@ -413,7 +413,7 @@ class Database(object):
             if name == lookup_name:
                 secret = self.storage.get_value(self.get_pass_key(name))
                 return auth, host, secret
-        Log.fatal("Nothing found for name \"{n}\" ...", n=lookup_name)
+        Log.fatal("Nothing found for name {n}", n=lookup_name)
 
     def shift(self, string):
         """Shift to the right a sting to remove any prefix.
