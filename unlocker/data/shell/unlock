@@ -22,7 +22,7 @@ if [ -z "$HOME" ]; then
 fi
 
 # dependency list
-DEPENDENCIES=unlocker python ping cat wc grep sed tr cut tee sshpass
+DEPENDENCIES="unlocker python ping cat wc grep sed tr cut tee" # sshpass"
 
 # set path to secrets
 SECRETS="$HOME/.unlocker/.secrets"
@@ -36,6 +36,9 @@ THIS_DIRECTORY=$(pwd)
 # path to temporary directory
 TEMP_DIRECTORY=/tmp/.unlocker
 
+# unlocker app
+UNLOCKER="python $THIS_DIRECTORY/unlocker.py"
+
 # service holder
 SERVER_SERVICE=""
 
@@ -48,13 +51,22 @@ PASSKEY=""
 # authentification method
 AUTH=""
 
+# server username
+USERNAME=""
+
+# server hostname
+HOSTNAME=""
+
+# server port
+PORT=""
+
 # clean close with error code
 close() {
     local EXIT_CODE=0
     if [ $# -eq 1 ]; then
         EXIT_CODE=$1
     fi
-    echo "Closing now..." && exit $EXIT_CODE
+    echo "Closed" && exit $EXIT_CODE
 }
 
 # check if file exists or not
@@ -222,13 +234,13 @@ safe_cleanup() {
 # save passkey into holder
 save_passkey() {
     if [ "x$DEBUG" = "x*" ]; then
-        PASSKEY=$(echo "$@" | unlocker)
+        PASSKEY=$(echo "$@" | $UNLOCKER)
     else
-        PASSKEY=$(echo "$@" | unlocker 2> /dev/null)
+        PASSKEY=$(echo "$@" | $UNLOCKER 2> /dev/null)
     fi
     if [ "$?" = "0" ]; then
         echo "Got passkey..."
-        local pass=$(echo "$PASSKEY" | tr '\n' ' ')
+        local pass="$(echo "$PASSKEY" | tr '\n' ' ')"
         PASSKEY=$(echo "$pass" | cut -d " " -f2 | python -m base64 -d)
         if [ "$?" != "0" ]; then
             echo "Failed to extract secrets from passkey..."
@@ -248,7 +260,7 @@ save_passkey() {
 
 # match server name if any
 find_server_name() {
-    local matches=$(unlocker list | cut -d "|" -f8 | grep "$1" | wc -l)
+    local matches=$($UNLOCKER list | cut -d "|" -f8 | grep "$1" | wc -l)
     if [ "$?" != "0" ]; then
         echo "Error: Something is wrong... cannot match the name of the server"
         close $ERROR_BAD_CALL
@@ -262,53 +274,22 @@ find_server_name() {
     fi
 }
 
-# lookup possible credentials
-find_credentials() {
-    export NOPAGER=true
-    local credentials=$(unlocker list | grep -E "$1 .* $2")
-    echo ">>>>..deqdwedfwefwfwfwfwe" $credentials
-    # for line in "$credentials"; do
-    #     local args=""
-    #     local user="$(echo $line | cut -d "|" -f 7 | tr -d " ")"
-    #     if [ ! -z "$user" ]; then
-    #         args="${args}$user@$2"
-    #     else
-    #         args="${args}$2"
-    #     fi
-    #     local port="$(echo $line | cut -d "|" -f 5 | tr -d " ")"
-    #     if [ ! -z "$port" ]; then
-    #         args="${args}:$port"
-    #     fi
-    #     echo $args
-    #     has_credentials="true"
-    # done
-    # if [ ]
-    # return $SUCCESS
-    unset NOPAGER
-}
-
-# safely read password
-read_password() {
-    if [ -z "$1" ]; then
-        echo "Missing password holder"
-        close $ERROR_BAD_CALL
-    fi
-    echo -n "Password: "
-    read -s $1
-    return $SUCCESS
-}
-
 # unlock SSH server
 unlock_ssh() {
+    if [ -z "$PORT" ]; then
+        PORT=22
+    fi
     case $AUTH in
         password) {
             export SSHPASS="$PASSKEY"
-            sshpass -e ssh $params
+            sshpass -e ssh "${USERNAME}@${HOSTNAME}" -P ${PORT}
             unset SSHPASS
         }
         ;;
         privatekey) {
-
+            local kf="$TEMP_DIRECTORY/$(date +%s).key"
+            echo "$PASSKEY" > "$kf"
+            ssh -i "${kf}" -p${PORT} "${USERNAME}@${HOSTNAME}"
         }
         ;;
         *) {
@@ -319,27 +300,59 @@ unlock_ssh() {
     esac
 }
 
+# try to find username from server address
+scan_server_address() {
+    local creds
+    if [ -z "$1" ]; then
+        echo "Cannot find username is no address is provided"
+        close $ERROR_BAD_CALL
+    fi
+    creds="$(echo $1 | sed -En 's/([a-zA-Z0-9_]+)@(.+):(.+)/\1 \2 \3/gp')"
+    if [ ! -z "$creds" ]; then
+        USERNAME=$(echo "$creds" | cut -d " " -f1)
+        HOSTNAME=$(echo "$creds" | cut -d " " -f2)
+        PORT=$(echo "$creds" | cut -d " " -f3)
+        return $SUCCESS
+    else
+        creds="$(echo $1 | sed -En 's/([a-zA-Z0-9_]+)@(.+):?.*/\1 \2/gp')"
+        if [ ! -z "$creds" ]; then
+            USERNAME=$(echo "$creds" | cut -d " " -f1)
+            HOSTNAME=$(echo "$creds" | cut -d " " -f2)
+            return $SUCCESS
+        else
+            HOSTNAME=$1
+            return $FAILURE
+        fi
+    fi
+    return $FAILURE
+}
+
 # unlocker wrapper
 unlock_server() {
     echo "Trying to unlock $SERVER_ADDRESS..."
+    if ! scan_server_address "$SERVER_ADDRESS"; then
+        echo "Cannot get username for server"
+    fi
     echo "Testing address..."
-    ping -q -c 1 $SERVER_ADDRESS
+    ping -q -c 1 $HOSTNAME > /dev/null 2>&1
     if [ "$?" = "0" ]; then
         echo "OK, server is online"
     else
         echo "Server is either offline, or bad address given..."
         echo "Testing possible naming patterns"
-        if ! find_server_name "$SERVER_ADDRESS"; then
+        if ! find_server_name "$HOSTNAME"; then
             echo "No records found for this server..."
             read -p "Press any key to continue or ^C to exit " anykey
-*        fi
+        fi
     fi
     echo "Trying to use $SERVER_SERVICE protocol..."
-    case $PROTOCOL in
+    case $SERVER_SERVICE in
         ssh) {
-            echo "Protocol is supported"
+            echo "Supported protocol..."
+            echo "Preparing tools..."
             echo "First attempt to get passkey..."
             if ! save_passkey "ssh://$SERVER_ADDRESS"; then
+                local unlock_args="-s ssh"
                 while true; do
                     echo "Cannot unlock server because no passkey is known"
                     echo "Do you have a password or a private key?"
@@ -352,26 +365,13 @@ unlock_server() {
                     else
                         case $auth in
                             1) {
-                                if ! read_password $PASSKEY; then
-                                    echo "Cannot read password..."
-                                    close $FAILURE
-                                else
-                                    AUTH="password"
-                                    echo "OK, got password!"
-                                    break
-                                fi
+                                AUTH="password"
+                                break
                             }
                             ;;
                             2) {
-                                local privatekey
-                                read -p "Path to private key: " privatekey
-                                if [ ! -f "$privatekey" ]; then
-                                    echo "Invalid path to privatekey"
-                                else
-                                    PASSKEY=$(cat "$privatekey")
-                                    AUTH="privatekey"
-                                    break
-                                fi
+                                AUTH="privatekey"
+                                break
                             }
                             ;;
                             3) {
@@ -386,87 +386,22 @@ unlock_server() {
                         esac
                     fi
                 done
-            fi
-            if ! unlock_ssh; then
-                echo "Failed to unlock SSH server $SERVER_ADDRESS"
-                close $FAILURE
-            fi
-
-            passkey=$(get_passkey ssh://$ADDRESS)
-            if [ -z "$passkey" ]; then
-                echo "Testing all possible credentials..."
-                for addr in "$(get_credentials $PROTOCOL $ADDRESS)"; do
-                    passkey=$(get_passkey ssh://$addr)
-                    if [ ! -z "$passkey" ]; then
-                        ADDRESS=$addr
-                        break
-                    fi
-                done
-            fi
-            params=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/\1@\2 -p\3/gp')
-            if [ -z "$params" ]; then
-                params=$ADDRESS
-            fi
-            if [ "x$DEBUG" = "xssh" -o "x$DEBUG" = "x*" ]; then
-                params="-v $params"
-            fi
-            if [ -z "$passkey" ]; then
-                echo "Cannot unlock server because passkey is missing..."
-                echo "Recovering..."
-                echo "Press any key to continue adding a password or a private key and store"
-                echo "it for later use, otherwise exit with ^C or add it to unlocker manually"
-                read -p "" anykey
-                echo "Choose how to connect:"
-                echo "  1) I have a password"
-                echo "  2) I have a privatekey"
-                echo ""
-                read -p "Type number: " auth
-                args=$(echo $ADDRESS | sed -En 's/(.+)@(.+):(.+)/-u \1 -h \2 -p \3/pg')
-                if [ -z "$args" ]; then
-                    args=$(echo $ADDRESS | sed -En 's/(.+)@(.+)/-u \1 -h \2 -p 22/pg')
-                    if [ -z "$args" ]; then
-                        get_credentials $PROTOCOL $ADDRESS
-                        args="-h $ADDRESS -p 22"
-                    fi
+                unlock_args="-a $AUTH $unlock_args"
+                local username=$(find_username "$SERVER_ADDRESS")
+                if [ -z "$username" ]; then
+                    echo "Please give a valid username for $SERVER_ADDRESS:"
+                    while true; do
+                        read -p "Username: " username
+                        if [ -z "$username" ]; then
+                            echo "No username given... Try again or ^C to exit"
+                        else
+                            break
+                        fi
+                    done
                 fi
-                case $auth in
-                    1) {
-                        args="-a password $args"
-                    }
-                    ;;
-                    2) {
-                        args="-a privatekey $args"
-                    }
-                    ;;
-                    *) {
-                        echo "Unsuported authentification method..."
-                        exit 1
-                    }
-                    ;;
-                esac
-                unlocker append $args
-                passkey=$(get_passkey ssh://$ADDRESS)
+                unlock_args="-u $username $unlock_args"
             fi
-            password=$(get_password "$passkey")
-            if [ -z "$password" ]; then
-                privatekey=$(get_private_key "$passkey")
-                if [ -z "$privatekey" ]; then
-                    echo "Cannot understand authentification method for $ADDRESS"
-                    echo "It may not be supported by unlocker or it may corrupted"
-                    exit 1
-                fi
-                secret_file=/tmp/.unlocker/$(date +%s).pk
-                echo "$privatekey" > $secret_file
-                chmod 0400 $secret_file
-                params="-i $secret_file $params"
-                is_installed ? ssh
-                ssh $params
-            else
-                is_installed ? sshpass
-                export SSHPASS="$password"
-                sshpass -e ssh $params
-                unset SSHPASS
-            fi
+            unlock_ssh "$unlock_args"
         }
         ;;
         *) {
@@ -536,6 +471,8 @@ fi
 # check if all needed dependencies are installed
 for app in $DEPENDENCIES; do
     if ! is_installed $app; then
+        echo "Missing dependency \"$app\" ..."
+        echo "Please install $app and try again"
         close $ERROR_MISSING_DEPS
     fi
 done
@@ -556,7 +493,7 @@ if ! initialize; then
 fi
 
 # unlock server
-unlock_service $@
+unlock_server $@
 
 # cleanup
 cleanup
