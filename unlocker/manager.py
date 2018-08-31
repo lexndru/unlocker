@@ -428,7 +428,9 @@ class Manager(object):
                 continue
             jump_index = indexes.get(jump.signature(), -1)
             if jump_index > -1:
-                sorted_hosts.insert(jump_index+1, known_hosts.pop(0))
+                if jump_index == 0:
+                    jump_index += 1
+                sorted_hosts.insert(jump_index, known_hosts.pop(0))
                 continue
             known_hosts.insert(len(known_hosts), known_hosts.pop(0))
         Log.debug("Sorted all known hosts and now preparing to print out...")

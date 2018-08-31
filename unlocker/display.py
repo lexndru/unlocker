@@ -38,14 +38,14 @@ APPEND_TEMPLATE = u"""
 
   {user}@{host}:{port}
 
-"""
+""".encode("utf-8")
 
 UPDATE_TEMPLATE = u"""
   Secrets successfully updated!
 
   {user}@{host}:{port}
 
-"""
+""".encode("utf-8")
 
 REMOVE_TEMPLATE = u"""
   Permanently removed secret {auth_type} for {host}!
@@ -54,14 +54,14 @@ REMOVE_TEMPLATE = u"""
 
   {user}@{ipv4}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
 
-"""
+""".encode("utf-8")
 
 LOOKUP_TEMPLATE = u"""
   Secret {auth_type} for {host}
 
   {user}@{ipv4}:{port}    \x1b[0;37;47m{passkey}\x1b[0m
 
-"""
+""".encode("utf-8")
 
 VERTICAL_LIST_TEMPLATE = u"""
 {nr:>4}) {name} ({sig}{jump_server})
@@ -69,7 +69,7 @@ VERTICAL_LIST_TEMPLATE = u"""
       IPv4: {ip}
       Port: {port} ({proto})
       User: {user}
-"""
+""".encode("utf-8")
 
 
 class Display(object):
@@ -228,7 +228,7 @@ class Display(object):
                 max_user_len = len(auth.get_user())
             records.append({
                 "auth_sig": auth.signature(),
-                "jump_sig": jump.signature() if jump is not None else "self",
+                "jump_sig": jump.signature() if jump is not None else "~",
                 "ip4": auth.get_host_ip4(),
                 "port": auth.get_port(),
                 "user": auth.get_user(),
@@ -241,9 +241,11 @@ class Display(object):
         line.append("{host:^%s}" % max_host_len)
         line.append("{user:^%s}" % max_user_len)
         line.append("{name:^%s}" % max_name_len)
-        line_tpl = u" {auth_sig:^10} | {jump_sig:^10} %s " + u" | ".join(line)
-        content = [cls.bind_params(line_tpl).format(**headers)]
-        separator = {
+        tpl = u" {auth_sig:^10} | {jump_sig:^10} | " + u" | ".join(line)
+        line_tpl = tpl.encode("utf-8")
+        content = [line_tpl.format(**headers)]
+        separator = {}
+        counters = {
             "auth_sig": 10,
             "jump_sig": 10,
             "ip4": 15,
@@ -253,30 +255,15 @@ class Display(object):
             "name": max_name_len,
             "host": max_host_len
         }
-        for k, v in separator.iteritems():
-            separator[k] = str(v * "=")
-        content.append(cls.bind_params(line_tpl).format(**separator))
+        for k, v in counters.iteritems():
+            separator[k] = unicode(v * "=")
+        content.append(line_tpl.format(**separator))
         for record in records:
-            row = cls.bind_params(line_tpl, record.get("jump"))
-            content.append(row.format(**record))
+            content.append(line_tpl.format(**record))
         content.append(cls.LINE_SEPARATOR)
         if len(records) == 0:
             content = ["Nothing to display... try \"append\" or \"update\""]
         cls.show(content)
-
-    @classmethod
-    def bind_params(cls, line_template, subparam=False):
-        """Helper function to draw a special char for servers using tunnels.
-
-        Args:
-            line_template (str): Template string to format.
-            subparam     (bool): Whether to draw special char or not.
-
-        Returns:
-            str: Template string to be formated.
-        """
-
-        return line_template % "|"
 
     @classmethod
     def show_dump(cls, passkey_dump):
