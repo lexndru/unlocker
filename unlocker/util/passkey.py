@@ -86,7 +86,7 @@ class Passkey(object):
         for ptype, prefix in cls.SUPPORTED_TYPES.iteritems():
             if secret[0] == prefix:
                 passkey = b64encode(secret[1:]) if not unsafe else secret[1:]
-                return ptype, passkey.encode("utf-8")
+                return ptype, passkey
         Log.fatal("Cannot copy secret: unsupported resolve method")
 
     def pin(self):

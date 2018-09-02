@@ -145,6 +145,34 @@ unlock_server() {
     console "Successfully closed connection to $SERVER..."
 }
 
+# decrypt secrets
+decrypt_secrets() {
+    if ! is_installed gpg; then
+        console err "Cannot decrypt secrets because some dependencies are missing:"
+        console err "\"gpg\" is NOT installed! Please install \"gpg\" and try again"
+        close $ERROR_MISSING_DEPS
+    fi
+
+    # decrypt secrets and delete the encrypted file
+    gpg -o "$SECRETS" --decrypt "$LOCKED_SECRETS"
+
+    # get exit code of decryption and don't delete the encrypted file if it failed
+    if [ "$?" != "0" ]; then
+        console err "Failed to decrypt secrets..."
+        console "Closing..."
+        close $ERROR_CANNOT_DECRYPT
+    else
+        rm -f "$LOCKED_SECRETS"  # it still outputs errors if any
+        console "Successfully decrypted..."
+        return $SUCCESS
+    fi
+    return $FAILURE
+}
+
+if [ -z "$1" ] && [ "$(ls -l "$LOCKED_SECRETS" | wc -l)" = "1" ]; then
+    decrypt_secrets && close $RESTART_ONCE
+fi
+
 # output a help message
 if [ "x$1" = "xhelp" -o "x$1" = "x" ]; then
     echo "              _            _             "
@@ -318,30 +346,6 @@ file_exists() {
 # check if dependency is installed
 is_installed() {
     if [ -x "$(command -v $1)" ]; then
-        return $SUCCESS
-    fi
-    return $FAILURE
-}
-
-# decrypt secrets
-decrypt_secrets() {
-    if ! is_installed gpg; then
-        console err "Cannot decrypt secrets because some dependencies are missing:"
-        console err "\"gpg\" is NOT installed! Please install \"gpg\" and try again"
-        close $ERROR_MISSING_DEPS
-    fi
-
-    # decrypt secrets and delete the encrypted file
-    gpg -o "$SECRETS" --decrypt "$LOCKED_SECRETS"
-
-    # get exit code of decryption and don't delete the encrypted file if it failed
-    if [ "$?" != "0" ]; then
-        console err "Failed to decrypt secrets..."
-        console "Closing..."
-        close $ERROR_CANNOT_DECRYPT
-    else
-        rm -f "$LOCKED_SECRETS"  # it still outputs errors if any
-        console "Successfully decrypted..."
         return $SUCCESS
     fi
     return $FAILURE
