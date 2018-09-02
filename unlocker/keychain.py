@@ -82,7 +82,7 @@ class Keychain(object):
         value = self.get(key)
         if value is None:
             Log.fatal("Keychain does not have requested key")
-        return unicode(decompress(b64decode(value)))  # force to string
+        return unicode(decompress(b64decode(value)).decode("utf-8"))
 
     def get(self, key):
         """Returns "as is" value for given key.
@@ -94,12 +94,12 @@ class Keychain(object):
             Exception: If value is not string or keychain does not have key.
 
         Returns:
-            str: Raw "as is" stored value for key.
+            str: Raw "as is" base64 stored value for key.
         """
 
         if not self.has(key):
             return None
-        return unicode(self.keychain[key])  # force to string
+        return self.keychain[key]
 
     def update(self, key, value):
         """Update key in keychain.
