@@ -112,14 +112,10 @@ RUN set -ex; \
 		\) -exec rm -rf '{}' +; \
 	rm -f get-pip.py
 
+RUN apk add --update --no-cache openssh sshpass curl
 RUN mkdir -p /opt
-
 COPY . /opt
-
 WORKDIR /opt
-
 RUN pip install -r requirements.txt && python setup.py test && python setup.py install
-
 ENV DEBUG true
-
 CMD ["unlocker", "install"]

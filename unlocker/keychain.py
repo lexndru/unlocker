@@ -82,7 +82,7 @@ class Keychain(object):
         value = self.get(key)
         if value is None:
             Log.fatal("Keychain does not have requested key")
-        return decompress(b64decode(value))
+        return unicode(decompress(b64decode(value)).decode("utf-8"))
 
     def get(self, key):
         """Returns "as is" value for given key.
@@ -94,7 +94,7 @@ class Keychain(object):
             Exception: If value is not string or keychain does not have key.
 
         Returns:
-            str: Raw "as is" stored value for key.
+            str: Raw "as is" base64 stored value for key.
         """
 
         if not self.has(key):
@@ -147,4 +147,4 @@ class Keychain(object):
                 yield k
 
     def __repr__(self):
-        return "Keychain has {} key(s) stored".format(len(self.keychain))
+        return "[{} key(s) stored]".format(len(self.keychain))

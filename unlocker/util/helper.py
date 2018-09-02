@@ -74,7 +74,7 @@ def deploy_lock_script():
         bool: True if successfully deployed, otherwise False.
     """
 
-    return deploy_script("lock")
+    return deploy_script("lock.sh")
 
 
 def deploy_unlock_script():
@@ -87,7 +87,7 @@ def deploy_unlock_script():
         bool: True if successfully deployed, otherwise False.
     """
 
-    return deploy_script("unlock")
+    return deploy_script("unlock.sh")
 
 
 def deploy_script(script_name):
@@ -107,6 +107,10 @@ def deploy_script(script_name):
     if not content:
         Log.fatal("Helper script is missing")
     script = "{}\n{}".format(SCRIPTS_SHEBANG, content)
+    try:
+        script_name, _ = script_name.split(".", 1)
+    except Exception:
+        Log.debug("Cannot find file extension for {s}", s=script_name)
     return make_helper_script(script_name, script)
 
 
