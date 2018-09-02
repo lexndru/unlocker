@@ -539,7 +539,7 @@ scan_server_address() {
             USER=$(echo "$creds" | cut -d " " -f1)
             HOST=$(echo "$creds" | cut -d " " -f2)
             local port="$(echo "$UNLOCKER_LIST" | grep "$SCHEME .* $HOST .* $USER")"
-            if [ -z "$port" ] || [ "$(echo $port | wc -l)" = "0" ]; then
+            if [ -z "$port" ] || [ "$(echo "$port" | wc -l)" = "0" ]; then
                 console err "Cannot find port for address ${SCHEME}://${USER}@${HOST}"
                 return $FAILURE
             fi
@@ -552,7 +552,7 @@ scan_server_address() {
                 HOST=$(echo "$creds" | cut -d " " -f1)
                 PORT=$(echo "$creds" | cut -d " " -f2)
                 local user="$(echo "$UNLOCKER_LIST" | grep "$SCHEME .* $PORT .* $HOST")"
-                if [ -z "$user" ] || [ "$(echo $user | wc -l)" = "0" ]; then
+                if [ -z "$user" ] || [ "$(echo "$user" | wc -l)" = "0" ]; then
                     console err "Cannot find user for address ${SCHEME}://${HOST}:${PORT}"
                     return $FAILURE
                 fi
@@ -570,7 +570,7 @@ scan_server_address() {
                 # nothing else to parse... it has to be the host
                 HOST=$1
                 local rest="$(echo "$UNLOCKER_LIST" | grep "$SCHEME .* $HOST")"
-                if [ -z "$rest" ] || [ "$(echo $rest | wc -l)" = "0" ]; then
+                if [ -z "$rest" ] || [ "$(echo "$rest" | wc -l)" = "0" ]; then
                     console err "Cannot find credentials for ${SCHEME}://${HOST}"
                     return $FAILURE
                 fi
@@ -584,7 +584,7 @@ scan_server_address() {
                     USER="$(read_param "$rest" $POS_USER | tr '\n' ' ' | cut -d " " -f1)"
                 fi
                 local port="$(echo "$UNLOCKER_LIST" | grep "$SCHEME .* $HOST .* $USER")"
-                if [ -z "$port" ] || [ "$(echo $port | wc -l)" = "0" ]; then
+                if [ -z "$port" ] || [ "$(echo "$port" | wc -l)" = "0" ]; then
                     console err "Cannot find port for address ${SCHEME}://${USER}@${HOST}"
                     return $FAILURE
                 fi
@@ -618,7 +618,7 @@ scan_server_address() {
         local number=0
         for name in $(read_param "$record" $POS_NAME); do
             number="$(expr $number + 1)"
-            console err "\t${number}) $name"
+            console err " ${number}) $name"
             default=$name  # keep last
         done
         read -p "Which one to use? Type name [$default]: " NAME
@@ -848,8 +848,7 @@ unlock_secrets() {
 
         # resolve conflict ...
         if [ "x$found_secrets" = "xtrue" ]; then
-            echo "Found both plain secrets and encrypted secrets..."
-            echo "This should have not happend! Choose how to continue:"
+            echo "Notice: Found both plain secrets and encrypted secrets! Choose how to continue"
             echo " 1) Move encrypted secrets file to current directory and use plain secrets"
             echo " 2) Use plain secrets and delete encrypted secrets file"
             echo " 3) Decrypt secrets file and overwrite plain secrets"
@@ -884,7 +883,7 @@ unlock_secrets() {
                     }
                     ;;
 
-                    # should I make this a default option? its the safest online
+                    # should I make this a default option? its the safest one
                     # since you decrypt something you know it's your own
                     3) {
                         if decrypt_secrets; then
@@ -983,9 +982,9 @@ bootstrap() {
     elif [ "$status" = "$FAILURE" ]; then
         console err "Unable to unlock $SERVER..."
         console err "Try these steps:"
-        console err "\t1) Please review your command line input"
-        console err "\t2) Run \"unlocker list\" and double check if the server is listed"
-        console err "\t3) If you consider this to be an error or a bug, please report at $HOMEPAGE"
+        console err " 1) Please review your command line input"
+        console err " 2) Run \"unlocker list\" and double check if the server is listed"
+        console err " 3) If you consider this to be an error or a bug, please report at $HOMEPAGE"
         close $ERROR_BAD_ARGUMENTS
     fi
 
