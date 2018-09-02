@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from shelve import open as read_secrets
+from gdbm import open as read_secrets
 from os import path, makedirs, environ, chmod
 from os.path import expanduser
 
