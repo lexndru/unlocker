@@ -72,7 +72,7 @@ Option | Meaning
 Unlocker comes with a few tricks out of the box, it is written with some conventions in mind and tries to make it easier for developers to follow a defined "way of doing things" and work faster, although it's not mandatory and ignoring this section does not affect the usage of *unlocker* in any way.
 
 #### Named servers with tags
-Give you server a name otherwise it will receive a random string as name. You know better what's the purpose of each server. Follow this small convention when naming a server: `tag:the_name_you_want` where tag is something *unlocker* recognizes as being part of the name. If you set the tag `live` or `prod` to your server, *unlocker* will warn you before connecting to this server (in case you made mistake when typing the name) and requires your direct confirmation to continue (this means you have to press a key to continue).
+Give your server a name otherwise it will receive a random string as name. You know better what's the purpose of each server. Follow this small convention when naming a server: `tag:the_name_you_want` where tag is something *unlocker* recognizes as being part of the name. If you set the tag `live` or `prod` to your server, *unlocker* will warn you before connecting to this server (e.g. in case you made a mistake when typing the name) and requires your direct confirmation to continue (this means you have to press a key to continue).
 ```
 $ unlock ssh live:that_cool_server  # unlocker will recognize the live tag
                                     # and give you a heads up
@@ -97,7 +97,7 @@ Switch to ssh? [yN] y
 ```
 
 #### Jump servers
-Unlocker can save credentials to a server, but it can also save a jump server for that connection to work. Mostly useful when you have connections to databases binded to `localhost` or are behind a firewall and accessible only though SSH tunnels. For e.g. if you have a MySQL server binded to 127.0.0.1 on your my.server.tld, then you have to save the SSH server first. afterwards you'll be able to get the signature of the server and add the MySQL connection as well.
+Unlocker can save credentials to a server, but it can also save a jump server for that connection to work. Mostly useful when you have connections on localhost servers (such as databases binded to `localhost` on a VPC) or are behind a firewall and accessible only though SSH tunnels. For e.g. if you have a MySQL server binded to 127.0.0.1 on your my.server.tld, then you have to save the SSH server first, afterwards you'll be able to get the signature of the server and add the MySQL connection as well.
 ```
 $ unlocker append -h my.server.tld -p 22 -u an_user -s ssh -a privatekey -n live:that_cool_server
 ...
