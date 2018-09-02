@@ -82,7 +82,7 @@ class Keychain(object):
         value = self.get(key)
         if value is None:
             Log.fatal("Keychain does not have requested key")
-        return unicode(decompress(b64decode(value)).decode("utf-8"))
+        return unicode(decompress(b64decode(value)).decode("utf-8"))  # FIXME: improve this...
 
     def get(self, key):
         """Returns "as is" value for given key.
