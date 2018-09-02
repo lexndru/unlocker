@@ -82,7 +82,7 @@ class Keychain(object):
         value = self.get(key)
         if value is None:
             Log.fatal("Keychain does not have requested key")
-        return decompress(b64decode(value))
+        return unicode(decompress(b64decode(value)))  # force to string
 
     def get(self, key):
         """Returns "as is" value for given key.
@@ -99,7 +99,7 @@ class Keychain(object):
 
         if not self.has(key):
             return None
-        return self.keychain[key]
+        return unicode(self.keychain[key])  # force to string
 
     def update(self, key, value):
         """Update key in keychain.
@@ -147,4 +147,4 @@ class Keychain(object):
                 yield k
 
     def __repr__(self):
-        return "Keychain has {} key(s) stored".format(len(self.keychain))
+        return "[{} key(s) stored]".format(len(self.keychain))
