@@ -6,6 +6,7 @@ Unlocker is a keychain and a CLI credentials manager. Useful when you use a term
 ## System requirements
 - cPython >= 2.7.12
 - pip >= 9.0.2
+- gdbm
 
 ## Install
 ```
@@ -234,8 +235,7 @@ Secrets are now encrypted. Don't forget the password!
 - [x] Encrypt secrets file
 - [x] Support secrets with connections through tunnels and jump servers
 - [x] Implement named records
-- [ ] Better support for unicode
-- [ ] Add filter for list columns (with exclude option)
+- [x] Better support for unicode
 - [ ] Create helper scripts for MacOS and Windows
 
 ## License

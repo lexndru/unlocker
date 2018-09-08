@@ -51,8 +51,8 @@ class Authority(object):
     MIN_PORT, MAX_PORT = 1, (2**16)-1
     MAX_USER_LEN = 32
     DELIMITER, COMPONENTS = ":", 3
-    HUMAN_READABLE_FORMAT = "{scheme}://{user}@{ipv4}:{port}"
-    COMPONENTS_FORMAT = "{host}:{port}:{user}:{scheme}"
+    HUMAN_READABLE_FORMAT = u"{scheme}://{user}@{ipv4}:{port}"
+    COMPONENTS_FORMAT = u"{host}:{port}:{user}:{scheme}"
 
     def __init__(self):
         self.host, self.port, self.user = None, None, None
@@ -138,10 +138,10 @@ class Authority(object):
         """Authority user getter.
 
         Returns:
-            str: Connection username.
+            unicode: Connection username.
         """
 
-        return self.user
+        return unicode(self.user)
 
     def set_user(self, user):
         """Authority user setter.
@@ -165,10 +165,10 @@ class Authority(object):
         """Authority scheme getter.
 
         Returns:
-            str: Connection scheme.
+            unicode: Connection scheme.
         """
 
-        return self.scheme
+        return unicode(self.scheme)
 
     def set_scheme(self, scheme):
         """Authority scheme setter.

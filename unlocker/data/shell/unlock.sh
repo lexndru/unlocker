@@ -169,7 +169,7 @@ decrypt_secrets() {
     return $FAILURE
 }
 
-if [ -z "$1" ] && [ "$(ls -l "$LOCKED_SECRETS" | wc -l)" = "1" ]; then
+if [ -z "$1" ] && [ "$(ls -l "$LOCKED_SECRETS" 2> /dev/null | wc -l)" = "1" ]; then
     decrypt_secrets && close $RESTART_ONCE
 fi
 

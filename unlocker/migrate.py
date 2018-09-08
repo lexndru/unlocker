@@ -43,6 +43,8 @@ class Migrate(object):
         Exception: If manager raises any exceptions.
     """
 
+    COLUMNS = 9  # +1 (starts from 0) number of exported/imported columns
+
     migrate_format = "zip"
     migrate_tmpdir = "/tmp/.x-unlocker"
     migrate_tmpfile = "secrets.list"
@@ -74,7 +76,7 @@ class Migrate(object):
         """
 
         for each in zf_secrets.read(self.migrate_tmpfile).split("\n"):
-            line = each.split("\t")
+            line = each.split("\t", self.COLUMNS)
             if len(line) == 0:
                 continue
             _, _, host, ipv4, port, user, scheme, name, ptype, passkey = line
@@ -110,7 +112,7 @@ class Migrate(object):
             passtype, passkey = Passkey.copy(secret, True)
             if passtype == "privatekey":
                 passkey = self.dump_pk_file(passkey, user, host, scheme)
-            jump_auth = "n/a"
+            jump_auth = "."
             if jump is not None:
                 jump_auth = jump.signature()
             rows.append((
@@ -141,7 +143,15 @@ class Migrate(object):
 
         # write all secrets to file...
         with open(self.get_tmp_path(self.migrate_tmpfile), "wb") as fd:
-            fd.write("\n".join(["\t".join(r) for r in content]))
+            safe_content = []
+            for ctx in content:
+                line = []
+                for each in ctx:
+                    if isinstance(each, str):
+                        each = each.decode("utf-8")
+                    line.append(each)
+                safe_content.append("\t".join(line))
+            fd.write("\n".join(safe_content).encode("utf-8"))
 
         # create temporary archive and flush it's content to stdout
         exp_pkg = "/tmp/{}".format(self.get_tmp_filename())

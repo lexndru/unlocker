@@ -28,7 +28,7 @@ try:
         raise ImportError("NOPAGER is set")
     from click import echo_via_pager as print_page
 except ImportError:
-    def print_page(content): stdout.write(content)
+    def print_page(content): stdout.write(content.encode("utf-8"))
 
 from unlocker.util.log import Log
 
@@ -181,30 +181,24 @@ class Display(object):
                        port=auth.get_port(), proto=auth.get_scheme(),
                        user=auth.get_user(), nr=len(content) + 1,
                        name=name, jump_server=jump_server)
+            if isinstance(record, str):
+                record = record.decode("utf-8")
             content.append(record)
         cls.show(content)
 
     @classmethod
-    def show_list_view(cls, rows, column, exclude, vertical, **kwargs):
+    def show_list_view(cls, rows, vertical, **kwargs):
         """Display records from keychain in a table-like view.
 
         Args:
             rows     (list): Records from keychain.
-            columns  (list): Columns to display.
-            exclude  (bool): Whether to exclude columns or not.
             vertical (bool): Whether to display in compatibility mode or not.
         """
 
         if vertical:
-            ignore_message = "Ignoring {} options in compatibility mode"
-            ignore_items = []
-            if len(column) > 0:
-                ignore_items.append("columns")
-            if exclude:
-                ignore_items.append("exclude")
-            if len(ignore_items) > 0:
-                Log.warn(ignore_message.format("/".join(ignore_items)))
             return cls.show_list_view_vertical(rows)
+        if len(rows) == 0:
+            return cls.show("Nothing to display...")
         headers = {
             "auth_sig": "hash",
             "jump_sig": "bounce",
@@ -226,6 +220,10 @@ class Display(object):
                 max_host_len = len(host)
             if len(auth.get_user()) > max_user_len:
                 max_user_len = len(auth.get_user())
+            if isinstance(host, str):
+                host = host.decode("utf-8")
+            if isinstance(name, str):
+                name = name.decode("utf-8")
             records.append({
                 "auth_sig": auth.signature(),
                 "jump_sig": jump.signature() if jump is not None else "~",
@@ -233,16 +231,15 @@ class Display(object):
                 "port": auth.get_port(),
                 "user": auth.get_user(),
                 "proto": auth.get_scheme(),
-                "host": host,
-                "name": name,
+                "host": unicode(host),
+                "name": unicode(name),
                 "jump": jump is not None
             })
         line = ["{proto:^8}", "{ip4:^15}", "{port:^5}"]
         line.append("{host:^%s}" % max_host_len)
         line.append("{user:^%s}" % max_user_len)
         line.append("{name:^%s}" % max_name_len)
-        tpl = u" {auth_sig:^10} | {jump_sig:^10} | " + u" | ".join(line)
-        line_tpl = tpl.encode("utf-8")
+        line_tpl = u" {auth_sig:^10} | {jump_sig:^10} | " + u" | ".join(line)
         content = [line_tpl.format(**headers)]
         separator = {}
         counters = {
@@ -259,10 +256,11 @@ class Display(object):
             separator[k] = unicode(v * "=")
         content.append(line_tpl.format(**separator))
         for record in records:
-            content.append(line_tpl.format(**record))
+            row = line_tpl.format(**record)
+            if isinstance(row, str):
+                row = row.decode("utf-8")
+            content.append(row)
         content.append(cls.LINE_SEPARATOR)
-        if len(records) == 0:
-            content = ["Nothing to display... try \"append\" or \"update\""]
         cls.show(content)
 
     @classmethod

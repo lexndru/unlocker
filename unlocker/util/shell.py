@@ -220,12 +220,8 @@ def get_list_shell(self, header="List known hosts from keychain"):
 
     psr = ArgumentParser(description=header)
     psr.add_argument(
-        "-e", "--exclude", action="store_true", dest="exclude",
-        help="Exclude columns given as positional arguments")
-    psr.add_argument(
         "-v", "--vertical", action="store_true", dest="vertical",
         help="Display list of hosts vertically (80 columns compatibility)")
-    psr.add_argument("column", help="Columns to display", nargs="*")
     return psr.parse_args(argv[2:])
 
 

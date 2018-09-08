@@ -20,7 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from gdbm import open as read_secrets
+try:
+    from gdbm import open as read_secrets
+except ImportError:
+    raise SystemExit("Missing dependency: gdbm module")
+
 from os import path, makedirs, environ, chmod
 from os.path import expanduser
 
