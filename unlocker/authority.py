@@ -141,6 +141,8 @@ class Authority(object):
             unicode: Connection username.
         """
 
+        if self.user is None:
+            Log.fatal("Authority has not set a valid user: unset user")
         return unicode(self.user)
 
     def set_user(self, user):
@@ -168,6 +170,8 @@ class Authority(object):
             unicode: Connection scheme.
         """
 
+        if self.scheme is None:
+            Log.fatal("Authority has not set a valid scheme: unset scheme")
         return unicode(self.scheme)
 
     def set_scheme(self, scheme):

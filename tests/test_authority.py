@@ -64,7 +64,9 @@ class TestAuthority(TestCase):
         self.assertEqual(self.auth.get_scheme(), "ssh")
 
     def test_user(self):
-        self.assertIsNone(self.auth.get_user())
+        with self.assertRaises(SystemExit) as context:
+            _ = self.auth.get_user()
+            self.assertTrue("Authority has not set a valid" in context.exception)
         self.auth.set_user("unlocker")
         self.assertNotEqual(self.auth.get_user(), "python")
         self.assertEqual(self.auth.get_user(), "unlocker")
