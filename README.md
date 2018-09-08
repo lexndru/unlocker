@@ -75,33 +75,50 @@ Unlocker comes with a few tricks out of the box, it is written with some convent
 #### Named servers with tags
 Give your server a name otherwise it will receive a random string as name. You know better what's the purpose of each server. Follow this small convention when naming a server: `tag:the_name_you_want` where tag is something *unlocker* recognizes as being part of the name. If you set the tag `live` or `prod` to your server, *unlocker* will warn you before connecting to this server (e.g. in case you made a mistake when typing the name) and requires your direct confirmation to continue (this means you have to press a key to continue).
 ```
-$ unlock ssh live:that_cool_server  # unlocker will recognize the live tag
-                                    # and give you a heads up
+$ unlock ssh live:that_cool_server  # unlocker recognizes "live" tag and gives a heads up
+Notice: Production server ahead!
+Notice: You are connecting to a LIVE production server...
+Notice: Proceed with caution
+Connecting to ssh://username@localhost:22 (live:that_cool_server) using password
+Press any key to continue or ^C to exit...
 ```
 
 #### Notification on `root` users
-*Unlocker* does't make a difference between one user or another, it just keeps your credentials for later use. But for a developer or for a sysadmin there's a huge difference between a `root` user an the next one. Whenever you attempt to connect to a server with a `root` user, *unlocker* will notify you and it requires your direct input as a confirmation (just as the `live` tag on named servers, it means a press of a key). The `root` user be the last option for an ambiguous connection.
+*Unlocker* does't make a difference between one user or another, it just keeps your credentials for later use. But for a developer or for a sysadmin there's a huge difference between a `root` user and the next one. Whenever you attempt to connect to a server with a `root` user, *unlocker* will notify you and it requires your direct input as a confirmation (just as the `live` tag on named servers, it means a press of a key). The `root` user will always be the last option for an ambiguous connection.
 ```
 $ unlock ssh localhost              # you haven't specified what user to use...
                                     # unlocker will query all possible options
                                     # from the known servers and choose the first
                                     # non-root user or fallback to root and alert
+...
+
+$ unlock ssh root@localhst
+Notice: Root user ahead!
+Notice: You are connecting to a server with ROOT privileges...
+Notice: Proceed with caution
+Connecting to ssh://root@localhost:22 using password
+Press any key to continue or ^C to exit...
 ```
 
 #### Switching protocols
-When connecting through a named server (e.g. `live:that_cool_server`) *unlocker* has a special feature of detecting protocol mistakes. If you, for some whatever reason, type `mysql` instead of `ssh` for your named server and there is no `mysql` known connection for that named server, then *unlocker* can detect other supported protocols and advise you to switch.
+When connecting via a named server (e.g. `live:that_cool_server`) *unlocker* has a special feature of detecting protocol mistakes. If you, for some whatever reason, type `mysql` instead of `ssh` for your named server and there is no `mysql` known connection for that named server, then *unlocker* can detect other supported protocols and advise you to switch.
 ```
 $ unlock redis live:that_cool_server
 You requested redis, but only ssh is available for this server
 Switch to ssh? [yN] y
-...
 ```
 
 #### Jump servers
-Unlocker can save credentials to a server, but it can also save a jump server for that connection to work. Mostly useful when you have connections on localhost servers (such as databases binded to `localhost` on a VPC) or are behind a firewall and accessible only though SSH tunnels. For e.g. if you have a MySQL server binded to 127.0.0.1 on your my.server.tld, then you have to save the SSH server first, afterwards you'll be able to get the signature of the server and add the MySQL connection as well.
+Unlocker can save credentials to a server, but it can also save a jump server for that connection to work. Mostly useful when you have connections on localhost servers (such as databases binded to `localhost` on a VPC) or are behind a firewall and accessible only though SSH tunnels. E.g. if you have a MySQL server binded to 127.0.0.1 on your my.server.tld, then you have to save the SSH server first, afterwards you'll be able to get the signature of the server and add the MySQL connection as well.
 ```
 $ unlocker append -h my.server.tld -p 22 -u an_user -s ssh -a privatekey -n live:that_cool_server
-...
+Path to private key: /tmp/secret.key
+
+  Secrets successfully added!
+
+  an_user@0.0.0.0:22           # this will be the IP address of my.server.tld
+
+
 $ unlocker list
    hash    |   bounce   | protocol |      ipv4       | port  |       hostname       |     user      |    friendly name    
 ========== | ========== | ======== | =============== | ===== | ==================== | ============= | ====================
@@ -110,7 +127,13 @@ $ unlocker list
 
 ```
 $ unlocker append -h localhost -p 3306 -u another_user -s mysql -a password -n db:my_mysql_server -j fa565262
-...
+Password: *****
+
+  Secrets successfully added!
+
+  another_user@127.0.0.1:3306
+
+
 $ unlocker list
    hash    |   bounce   | protocol |      ipv4       | port  |       hostname       |     user      |    friendly name    
 ========== | ========== | ======== | =============== | ===== | ==================== | ============= | ====================

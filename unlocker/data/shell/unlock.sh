@@ -665,7 +665,7 @@ find_server_address_or_name() {
         fi
 
         # notify user about production servers...
-        local tag="$(echo "$1" | sed -En 's/([a-zA-Z]+):([a-zA-Z][a-zA-Z0-9\-\.]+)/\1/gp')"
+        local tag="$(echo "$1" | sed -En 's/([a-zA-Z]+):([a-zA-Z][a-zA-Z0-9\-\.\_]+)/\1/gp')"
         case $tag in
             live|prod) {
                 echo "Notice: Production server ahead!"
