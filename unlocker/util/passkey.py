@@ -81,7 +81,7 @@ class Passkey(object):
             tuple: Passkey type and copy of unsolved (raw) secret.
         """
 
-        if len(secret) <= cls.MIN_LEN:
+        if len(secret) < cls.MIN_LEN:
             Log.fatal("Secret size too small")
         for ptype, prefix in cls.SUPPORTED_TYPES.iteritems():
             if secret[0] == prefix:

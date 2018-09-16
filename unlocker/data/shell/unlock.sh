@@ -1,3 +1,14 @@
+# check if the HOME variable is missing
+if [ -z "$HOME" ]; then
+    echo "Cannot find your user's home directory..." && exit 1
+fi
+
+# set path to secrets
+SECRETS="$HOME/.unlocker/.secrets"
+
+# set path to encrypted secrets (same directory, different filename)
+LOCKED_SECRETS="$SECRETS.lock"
+
 # define exit errors constants
 SUCCESS=0
 FAILURE=1
@@ -20,6 +31,72 @@ SUPPORTED_PROTOCOLS="ssh http https redis mysql psql mongo"
 if [ "x$DEBUG" = "xtrue" ]; then
     set -x
 fi
+
+# output wrapper
+console() {
+    if [ $# -eq 2 ] && [ "x$1" = "xerr" ]; then
+        shift
+        echo "$1" 1>&2
+    elif [ ! -z "$DEBUG" ]; then
+        echo "$1"
+    fi
+}
+
+# clean close with error code
+close() {
+    local EXIT_CODE=0
+    if [ $# -eq 1 ]; then
+        EXIT_CODE=$1
+    fi
+    console "Closed"
+    exit $EXIT_CODE
+}
+
+# check if dependency is installed
+is_installed() {
+    if [ -z "$1" ]; then
+        close $ERROR_BAD_CALL
+    fi
+    if [ -x "$(command -v $1)" ]; then
+        return $SUCCESS
+    fi
+    return $FAILURE
+}
+
+# output an error with missing dependency
+require_deps() {
+    if [ $# -eq 0 ]; then
+        console err "Cannot yield missing dependencies without a list of dependencies"
+        close $ERROR_BAD_CALL
+    fi
+    console err "Notice: You're connecting to a $SCHEME server ($SERVER) with a $AUTH"
+    console err "Notice: The following packages are required in order to continue:"
+    local count=0
+    for dep in $@; do
+        count=$(expr $count + 1)
+        console err " ${count}) $dep"
+    done
+    console err "Please install the packages listed above and try again"
+    close $ERROR_MISSING_DEPS
+}
+
+# detect port for service
+autodetect_port() {
+    case $SCHEME in
+        http)       PORT=80     ;;
+        https)      PORT=443    ;;
+        redis)      PORT=3306   ;;
+        kafka)      PORT=9092   ;;
+        mongo)      PORT=27017  ;;
+        neo4j)      PORT=7474   ;;
+        mysql)      PORT=3306   ;;
+        psql)       PORT=5432   ;;
+        smtp)       PORT=25     ;;
+        ssh)        PORT=22     ;;
+        ftp)        PORT=21     ;;
+        rsync)      PORT=873    ;;
+    esac
+}
 
 # unlock servers wrapper
 unlock_server() {
@@ -170,7 +247,11 @@ decrypt_secrets() {
 }
 
 if [ -z "$1" ] && [ "$(ls -l "$LOCKED_SECRETS" 2> /dev/null | wc -l)" = "1" ]; then
-    decrypt_secrets && close $RESTART_ONCE
+    if decrypt_secrets; then
+        close $RESTART_ONCE
+    else
+        close $ERROR_CANNOT_DECRYPT
+    fi
 fi
 
 # output a help message
@@ -214,19 +295,8 @@ if [ -z "$2" ]; then
     echo "Required arguments are missing: see \"unlock help\" for examples" && exit 1
 fi
 
-# check if the HOME variable is missing
-if [ -z "$HOME" ]; then
-    echo "Cannot find your user's home directory..." && exit 1
-fi
-
 # dependency list
 DEPENDENCIES="unlocker python tail cat wc grep sed tr cut tee touch mkdir ls mv rm"
-
-# set path to secrets
-SECRETS="$HOME/.unlocker/.secrets"
-
-# set path to encrypted secrets (same directory, different filename)
-LOCKED_SECRETS="$SECRETS.lock"
 
 # save current working directory
 THIS_DIRECTORY=$(pwd)
@@ -276,61 +346,6 @@ POS_HOST=6
 POS_USER=7
 POS_NAME=8
 
-# detect port for service
-autodetect_port() {
-    case $SCHEME in
-        http)       PORT=80     ;;
-        https)      PORT=443    ;;
-        redis)      PORT=3306   ;;
-        kafka)      PORT=9092   ;;
-        mongo)      PORT=27017  ;;
-        neo4j)      PORT=7474   ;;
-        mysql)      PORT=3306   ;;
-        psql)       PORT=5432   ;;
-        smtp)       PORT=25     ;;
-        ssh)        PORT=22     ;;
-        ftp)        PORT=21     ;;
-        rsync)      PORT=873    ;;
-    esac
-}
-
-# output wrapper
-console() {
-    if [ $# -eq 2 ] && [ "x$1" = "xerr" ]; then
-        shift
-        echo "$1" 1>&2
-    elif [ ! -z "$DEBUG" ]; then
-        echo "$1"
-    fi
-}
-
-# clean close with error code
-close() {
-    local EXIT_CODE=0
-    if [ $# -eq 1 ]; then
-        EXIT_CODE=$1
-    fi
-    console "Closed"
-    exit $EXIT_CODE
-}
-
-# output an error with missing dependency
-require_deps() {
-    if [ $# -eq 0 ]; then
-        console err "Cannot yield missing dependencies without a list of dependencies"
-        close $ERROR_BAD_CALL
-    fi
-    console err "Notice: You're connecting to a $SCHEME server ($SERVER) with a $AUTH"
-    console err "Notice: The following packages are required in order to continue:"
-    local count=0
-    for dep in $@; do
-        count=$(expr $count + 1)
-        console err " ${count}) $dep"
-    done
-    console err "Please install the packages listed above and try again"
-    close $ERROR_MISSING_DEPS
-}
-
 # check if file exists or not
 file_exists() {
     if [ -z "$1" ]; then
@@ -341,14 +356,6 @@ file_exists() {
         return $FAILURE
     fi
     return $SUCCESS
-}
-
-# check if dependency is installed
-is_installed() {
-    if [ -x "$(command -v $1)" ]; then
-        return $SUCCESS
-    fi
-    return $FAILURE
 }
 
 # create temporary unlocker file storage
