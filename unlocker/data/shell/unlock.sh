@@ -23,6 +23,7 @@ ERROR_CANNOT_CREATE=107
 ERROR_UNSUPPORTED_SCHEME=108
 ERROR_RACE_COND=110
 ERROR_BAD_ARGUMENTS=120
+ERROR_NO_TUNNEL=130
 
 # supported protocols
 SUPPORTED_PROTOCOLS="ssh http https redis mysql psql mongo"
@@ -98,11 +99,106 @@ autodetect_port() {
     esac
 }
 
+# dump private key to temporary file
+temp_key_file() {
+    local key_file
+
+    # validate temporary directory and key
+    if [ -z "$TEMP_DIRECTORY" ]; then
+        console err "Cannot find temporary directory"
+        close $ERROR_CANNOT_CREATE
+    elif [ -z "$PASSKEY" ]; then
+        console err "Cannot find passkey or it is invalid"
+        close $ERROR_NO_SECRETS
+    fi
+
+    # create temporary key file and return its path
+    key_file="$TEMP_DIRECTORY/$(date +%s).key"
+    echo "$PASSKEY" > "$key_file" 2> /dev/null
+    echo "$key_file"
+}
+
+# create ssh tunnel and update global port
+global_ssh_tunnel() {
+    local local_port
+
+    # find an available port on local machine
+    local_port=$(python -c 'import socket as S;s=S.socket();s.bind(("",0));_,p=s.getsockname();s.close();print(p)')
+
+    # announce tunnel connection
+    console "Establishing tunnel on port $local_port ..."
+
+    # backup passkey and auth method
+    local server_auth="$AUTH"
+    local server_pass="$PASSKEY"
+
+    # find the jump server pointed at
+    local jump_record="$(query_unlocker "$JUMP" $POS_SIGN)"
+    local jump_name="$(read_param "$jump_record" $POS_NAME)"
+    local jump_host="$(read_param "$jump_record" $POS_HOST)"
+    local jump_port="$(read_param "$jump_record" $POS_PORT)"
+    local jump_user="$(read_param "$jump_record" $POS_USER)"
+
+    # get passkey for jump server and set back server passkey
+    if ! save_passkey "$jump_name"; then
+        console err "Cannot open tunnel without a passkey or an invalid address"
+        return $FAILURE
+    elif [ "x$AUTH" != "xprivatekey" ]; then
+        console err "Unsuported tunnel authentification method: \"$AUTH\", must be private key"
+        return $FAILURE
+    elif [ -z "$PASSKEY" ]; then
+        console err "Tunnel authentification set to private key but passkey is invalid"
+        return $FAILURE
+    fi
+
+    # create a tunnel and wait for 10 seconds for a connection to be made
+    ssh -f -L $local_port:$IPv4:$PORT -i $(temp_key_file) -p $jump_port ${jump_user}@${jump_host} sleep 10
+
+    # update global port
+    PORT=$local_port
+
+    # restore auth and passkey
+    AUTH="$server_auth"
+    PASSKEY="$server_pass"
+
+    # replace hostname with ip address
+    # some services do not work with tunnel through hostnames
+    HOST="$IPv4"
+
+    # announce disconnect before closing
+    console "Closing tunnel after 10 seconds of inactivity ..."
+
+    return $SUCCESS
+}
+
+# service cli helper
+build_args() {
+    local args
+    if [ $# -eq 0 ]; then
+        console err "Cannot build CLI arguments without any arguments"
+        close $ERROR_BAD_CALL
+    fi
+    args="$*"
+    if [ "x$CMD_ARGS" != "x" ]; then
+        args="$args $CMD_ARGS"
+    fi
+    echo "$args"
+}
+
 # unlock servers wrapper
 unlock_server() {
+    shift && shift
+
+    # save optional command arguments
+    CMD_ARGS="$*"
 
     # preparing to connect user to server
     console "Establishing connection to $SERVER ..."
+
+    if [ "x$JUMP" != "x~" ] && ! global_ssh_tunnel; then
+        console err "Failed to initialize connection through tunnel ($JUMP)"
+        close $ERROR_NO_TUNNEL
+    fi
 
     # detect connection protocol and call proper unlock method
     case $SCHEME in
@@ -112,11 +208,7 @@ unlock_server() {
             if ! is_installed curl; then
                 require_deps curl
             fi
-            local args="-u ${USER}:${PASSKEY}"
-            if [ ! -z "$DEBUG" ]; then
-                args="$args -v"
-            fi
-            curl ${SCHEME}://${HOST}:${PORT} $args
+            curl $(build_args "${SCHEME}://${HOST}:${PORT} -u ${USER}:${PASSKEY}")
         }
         ;;
 
@@ -125,10 +217,7 @@ unlock_server() {
             if ! is_installed redis-cli; then
                 require_deps redis
             fi
-            if [ ! -z "$DEBUG" ]; then
-                console "No debug output for Redis"
-            fi
-            redis-cli -h $HOST -p $PORT -a $PASSKEY
+            redis-cli $(build_args "-h $HOST -p $PORT -a $PASSKEY")
         }
         ;;
 
@@ -137,10 +226,7 @@ unlock_server() {
             if ! is_installed mongo; then
                 require_deps mongodb-org
             fi
-            if [ ! -z "$DEBUG" ]; then
-                console "No debug output for MongoDB"
-            fi
-            mongo --username $USER --password $PASSKEY --host $HOST --port $PORT
+            mongo $(build_args "--username $USER --password $PASSKEY --host $HOST --port $PORT")
         }
         ;;
 
@@ -149,11 +235,8 @@ unlock_server() {
             if ! is_installed psql; then
                 require_deps postgresql
             fi
-            if [ ! -z "$DEBUG" ]; then
-                console "No debug output for PostgreSQL"
-            fi
             export PGPASSWORD="$PASSKEY"
-            psql -h $HOST -p $PORT -U $USER
+            psql $(build_args "-h $HOST -p $PORT -U $USER")
             unset PGPASSWORD
         }
         ;;
@@ -163,11 +246,7 @@ unlock_server() {
             if ! is_installed mysql; then
                 require_deps mysql-client
             fi
-            local args="-h $HOST -p$PASSKEY -P $PORT -u $USER"
-            if [ ! -z "$DEBUG" ]; then
-                args="$args -v"
-            fi
-            mysql --reconnect $args
+            mysql $(build_args "-h $HOST -p$PASSKEY -P $PORT -u $USER")
         }
         ;;
 
@@ -179,11 +258,7 @@ unlock_server() {
                         require_deps sshpass
                     fi
                     export SSHPASS="$PASSKEY"
-                    local verbose=""
-                    if [ ! -z "$DEBUG" ]; then
-                        verbose="-v "
-                    fi
-                    sshpass ${verbose}-e ssh "${USER}@${HOST}" -P ${PORT}
+                    sshpass -e ssh $(build_args "${USER}@${HOST} -P ${PORT}")
                     unset SSHPASS
                 }
                 ;;
@@ -191,13 +266,7 @@ unlock_server() {
                     if ! is_installed ssh; then
                         require_deps openssh-server
                     fi
-                    local kf="$TEMP_DIRECTORY/$(date +%s).key"
-                    echo "$PASSKEY" > "$kf"
-                    local args="-i ${kf} -p${PORT}"
-                    if [ ! -z "$DEBUG" ]; then
-                        args="$args -v"
-                    fi
-                    ssh "${USER}@${HOST}" $args
+                    ssh $(build_args "-i $(temp_key_file) -p${PORT} ${USER}@${HOST}")
                 }
                 ;;
                 *) {
@@ -218,7 +287,7 @@ unlock_server() {
 
     esac
 
-    # used is now disconected
+    # user is now disconected
     console "Successfully closed connection to $SERVER..."
 }
 
@@ -327,11 +396,17 @@ USER=""
 # server hostname
 HOST=""
 
+# server ip address
+IPv4=""
+
 # server port
 PORT=""
 
 # server alias name
 NAME=""
+
+# server jump
+JUMP=""
 
 # credentials
 CREDENTIALS="SCHEME SERVER AUTH USER HOST PORT NAME PASSKEY"
@@ -345,6 +420,9 @@ POS_PORT=5
 POS_HOST=6
 POS_USER=7
 POS_NAME=8
+
+# store optional service cli arguments
+CMD_ARGS=""
 
 # check if file exists or not
 file_exists() {
@@ -504,8 +582,10 @@ scan_server_alias() {
     # get all missing variables
     NAME=$(read_param "$record" $POS_NAME)
     HOST=$(read_param "$record" $POS_HOST)
+    IPv4=$(read_param "$record" $POS_IPv4)
     USER=$(read_param "$record" $POS_USER)
     PORT=$(read_param "$record" $POS_PORT)
+    JUMP=$(read_param "$record" $POS_JUMP)
 
     # validate scheme and try to correct ...
     scheme=$(read_param "$record" $POS_SCHEME)
@@ -641,6 +721,10 @@ scan_server_address() {
         # get whatever alias is available
         NAME=$(read_param "$record" $POS_NAME)
     fi
+
+    # save jump signature and host IP
+    JUMP=$(read_param "$record" $POS_JUMP)
+    IPv4=$(read_param "$record" $POS_IPv4)
 
     # feedback confirmation with address and alias
     console "Saving name for $addr as $NAME"
