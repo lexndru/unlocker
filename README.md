@@ -232,17 +232,25 @@ $ unlocker migrate
 OK
 ```
 
-#### Export secrets to unlocker file (.unl)
+#### Export all secrets to unlocker file (.unl)
 ```
 $ unlocker migrate --export > /tmp/secrets.unl
 OK
 ```
+
+#### Export only certain secrets to unlocker file (.unl)
+```
+$ unlocker migrate --export name_1 name_2 name_3 > /tmp/secrets.unl
+OK
+```
+*Notice: export tool does not check for jump servers. It's up to the user to select all needed servers to export*
 
 #### Import secrets from unlocker file (.unl)
 ```
 $ unlocker migrate --import < /tmp/secrets.unl
 OK
 ```
+*Notice: current version of import does not map jump servers. It's up to the user to manually map imported servers*
 
 #### Encrypt your secrets
 ```

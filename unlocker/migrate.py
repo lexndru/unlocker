@@ -95,10 +95,13 @@ class Migrate(object):
             self.manager.get_db().add(**data)
         Log.warn("Unsupported import for jump server, yet")
 
-    def export_secrets(self):
+    def export_secrets(self, records=[]):
         """Export secrets wrapper.
 
         Loop through all secrets and export authority and passkeys.
+
+        Args:
+            records (list): Optional list of named servers to filter on export.
 
         Raises:
             SystemExit: If there's nothing to export.
@@ -106,6 +109,8 @@ class Migrate(object):
 
         rows = []
         for name, auth, host, jump in self.manager.get_db().query_all():
+            if len(records) > 0 and name not in records:
+                continue
             ipv4, port = auth.get_host_ip4(), str(auth.get_port())
             user, scheme = auth.get_user(), auth.get_scheme()
             _, _, secret = self.manager.get_db().lookup(name)
@@ -234,7 +239,7 @@ class Migrate(object):
         export_secrets = manager.args.get("export_secrets")
 
         # fail fast if no options is provided...
-        if not import_secrets and not export_secrets:
+        if import_secrets is not True and not isinstance(export_secrets, list):
             Log.fatal("Unexpected migrate request...")
 
         # create tmp dir if not eixsts...
@@ -243,14 +248,14 @@ class Migrate(object):
 
         # run migration
         mig = cls(manager)
-        if import_secrets:
+        if import_secrets is True:
             if stdin.isatty():
                 Log.fatal("Migration failed: stdin is empty")
             mig.import_secrets()
-        elif manager.args.get("export_secrets"):
+        elif isinstance(export_secrets, list) and len(export_secrets) >= 0:
             if stdout.isatty():
                 Log.fatal("Migration failed: stdout is empty")
-            mig.export_secrets()
+            mig.export_secrets(records=export_secrets)
 
         # cleanup
         rmtree(cls.migrate_tmpdir)

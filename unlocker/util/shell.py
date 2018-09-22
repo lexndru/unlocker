@@ -261,9 +261,10 @@ def get_migrate_shell(self):
                          dest="import_secrets",
                          help="Import secrets from STDIN")
         grp.add_argument("--export",
-                         action="store_true",
+                         action="store",
                          dest="export_secrets",
-                         help="Export secrets to STDOUT")
+                         help="Export secrets to STDOUT",
+                         nargs="*")
         return psr.parse_args(argv[2:])
     try:
         Secret.migrate_secrets()
